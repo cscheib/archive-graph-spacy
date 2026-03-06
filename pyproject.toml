@@ -1,0 +1,25 @@
+[project]
+name = "archive-graph-spacy"
+version = "0.1.0"
+description = "spaCy-based named entity recognition utilities for archive graph work"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "spacy>=3.8,<4.0",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3,<9.0",
+]
+
+[build-system]
+requires = ["hatchling>=1.27,<2.0"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.uv]
+package = true
