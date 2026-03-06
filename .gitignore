@@ -1,0 +1,17 @@
+# Local Codex state
+.codex/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor state
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs and temp files
+*.log
+*.tmp
+tmp/
