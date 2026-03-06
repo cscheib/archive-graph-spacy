@@ -30,6 +30,9 @@ not source material.
   run a preset DuckDB query against persisted derived edge tables.
 - `uv run python -m archive_graph_spacy.scripts.visualize_ego data_exports/<name>/derived <person_id>`:
   render a small HTML ego-network from `person_person_edges`.
+- Python entrypoints load repo-local `.env` automatically. Set
+  `OWNER_PERSON_ID` there when using owner-aware graph filters. The default
+  owner mode is `downrank`; change it in the UI or with `--owner-mode`.
 - `uv run python -m spacy download en_core_web_sm`: install a local English
   model for manual experimentation.
 - `uv lock`: refresh `uv.lock` after dependency changes.

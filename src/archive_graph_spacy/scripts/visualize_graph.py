@@ -8,6 +8,11 @@ from pathlib import Path
 import duckdb
 from pyvis.network import Network
 
+from archive_graph_spacy.config import get_owner_person_id
+
+VALID_OWNER_MODES = ("normal", "downrank", "hide")
+DEFAULT_OWNER_MODE = "downrank"
+
 LEGEND_HTML = """
 <div style="
     position: fixed;
@@ -50,6 +55,8 @@ def render_graph(
     *,
     limit: int = 250,
     min_messages: int = 1,
+    owner_person_id: str | None = None,
+    owner_mode: str = DEFAULT_OWNER_MODE,
 ) -> Path:
     edge_path = derived_dir / "person_person_edges.jsonl"
     if not edge_path.exists():
@@ -58,18 +65,35 @@ def render_graph(
             "`uv run python -m archive_graph_spacy.scripts.build_edges <export_dir>` first."
         )
 
-    query = """
+    filters = [
+        "person_a_type = 'person'",
+        "person_b_type = 'person'",
+        "message_count >= ?",
+    ]
+    params: list[object] = [str(edge_path), min_messages]
+    if owner_person_id and owner_mode == "hide":
+        filters.extend(["person_a_id != ?", "person_b_id != ?"])
+        params.extend([owner_person_id, owner_person_id])
+
+    order_by = "message_count DESC, confidence DESC, person_a_name, person_b_name"
+    if owner_person_id and owner_mode == "downrank":
+        order_by = (
+            "CASE WHEN person_a_id = ? OR person_b_id = ? THEN 1 ELSE 0 END ASC, "
+            + order_by
+        )
+        params.extend([owner_person_id, owner_person_id])
+
+    query = f"""
         SELECT *
         FROM read_json_auto(?)
-        WHERE person_a_type = 'person'
-          AND person_b_type = 'person'
-          AND message_count >= ?
-        ORDER BY message_count DESC, confidence DESC, person_a_name, person_b_name
+        WHERE {' AND '.join(filters)}
+        ORDER BY {order_by}
         LIMIT ?
     """
+    params.append(limit)
 
     con = duckdb.connect()
-    rows = con.execute(query, [str(edge_path), min_messages, limit]).fetchall()
+    rows = con.execute(query, params).fetchall()
     columns = [column[0] for column in con.description]
     records = [dict(zip(columns, row, strict=False)) for row in rows]
 
@@ -166,12 +190,25 @@ def main() -> int:
         default=1,
         help="Minimum message_count required to include an edge",
     )
+    parser.add_argument(
+        "--owner-person-id",
+        help="Optional owner person_id to hide or downrank in the graph",
+    )
+    parser.add_argument(
+        "--owner-mode",
+        choices=VALID_OWNER_MODES,
+        default=DEFAULT_OWNER_MODE,
+        help="How to treat the owner in the graph",
+    )
     args = parser.parse_args()
+    owner_person_id = args.owner_person_id or get_owner_person_id()
     output = render_graph(
         args.derived_dir,
         args.output,
         limit=args.limit,
         min_messages=args.min_messages,
+        owner_person_id=owner_person_id,
+        owner_mode=args.owner_mode,
     )
     print(output)
     return 0

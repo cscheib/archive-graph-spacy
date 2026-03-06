@@ -32,6 +32,26 @@ uv run python -m archive_graph_spacy.scripts.query_edges data_exports/graph-data
 uv run python -m archive_graph_spacy.scripts.visualize_ego data_exports/graph-data-sample/derived p-alice
 ```
 
+## Environment
+
+Python entrypoints load `.env` automatically via `python-dotenv`. Set the
+archive owner once and let the query and visualization tools use it as the
+default owner filter:
+
+```bash
+cp .env.example .env
+```
+
+Example `.env`:
+
+```dotenv
+OWNER_PERSON_ID=p_0270000ea9de
+```
+
+You can still override this explicitly with `--owner-person-id` on the CLI or
+with the Owner Controls in the web app. The default owner mode is `downrank`,
+which keeps the owner visible but surfaces non-owner relationships first.
+
 ## Install a spaCy model
 
 ```bash

@@ -14,6 +14,7 @@ from urllib.parse import parse_qs, urlencode, urlparse
 
 import duckdb
 
+from archive_graph_spacy.config import get_owner_person_id
 from archive_graph_spacy.extract import extract_message_mentions
 from archive_graph_spacy.io import load_export_bundle
 from archive_graph_spacy.link import link_mentions_to_people
@@ -22,6 +23,8 @@ from archive_graph_spacy.scripts.build_edges import build_edges
 from archive_graph_spacy.scripts.visualize_ego import render_ego_graph
 from archive_graph_spacy.scripts.visualize_graph import render_graph
 
+VALID_OWNER_MODES = ("normal", "downrank", "hide")
+DEFAULT_OWNER_MODE = "downrank"
 LABEL_COLORS = {
     "PERSON": "#fef08a",
     "PERSON_CANDIDATE": "#fde68a",
@@ -237,18 +240,75 @@ td, th {{ text-align:left; border-top:1px solid #e7e5e4; padding:8px 6px; vertic
 </body></html>"""
 
 
-def render_messages_page(bundle: Path) -> str:
+def _message_priority(bundle: Path) -> dict[str, tuple[int, int]]:
+    derived_path = bundle / "derived" / "person_message_edges.jsonl"
+    if not derived_path.exists():
+        return {}
+    con = duckdb.connect()
+    rows = con.execute(
+        """
+        SELECT
+            message_id,
+            SUM(
+                CASE role
+                    WHEN 'sender' THEN 3
+                    WHEN 'recipient' THEN 3
+                    WHEN 'mentioned' THEN 1
+                    ELSE 0
+                END
+            ) AS signal_score,
+            COUNT(*) AS person_edge_count
+        FROM read_json_auto(?)
+        WHERE person_type = 'person'
+        GROUP BY message_id
+        """,
+        [str(derived_path)],
+    ).fetchall()
+    return {row[0]: (int(row[1]), int(row[2])) for row in rows}
+
+
+def render_messages_page(bundle: Path, *, page: int = 1, page_size: int = 100) -> str:
     _contacts, messages = load_bundle(bundle)
+    page = max(page, 1)
+    page_size = max(page_size, 1)
+    priority = _message_priority(bundle)
+    ordered_messages = sorted(
+        messages,
+        key=lambda item: (
+            priority.get(item.message_id, (0, 0))[0],
+            priority.get(item.message_id, (0, 0))[1],
+            item.timestamp or datetime.min,
+        ),
+        reverse=True,
+    )
+    total_messages = len(ordered_messages)
+    total_pages = max((total_messages + page_size - 1) // page_size, 1)
+    page = min(page, total_pages)
+    start = (page - 1) * page_size
+    end = start + page_size
     rows = []
-    for message in sorted(messages, key=lambda item: item.timestamp or datetime.min, reverse=True)[:100]:
+    for message in ordered_messages[start:end]:
+        signal_score, person_edge_count = priority.get(message.message_id, (0, 0))
         rows.append(
             "<tr>"
             f"<td><a href=\"/message?{urlencode({'bundle': bundle.name, 'message_id': message.message_id})}\">"
             f"{html.escape(message.subject or '(no subject)')}</a></td>"
+            f"<td>{person_edge_count}</td>"
+            f"<td>{signal_score}</td>"
             f"<td>{html.escape(message.source)}</td>"
             f"<td>{html.escape(str(message.timestamp or ''))}</td>"
             f"<td>{html.escape(message.sender)}</td>"
             "</tr>"
+        )
+    nav_parts = []
+    if page > 1:
+        nav_parts.append(
+            f'<a href="/messages?{urlencode({"bundle": bundle.name, "page": page - 1, "page_size": page_size})}">Previous</a>'
+        )
+    nav_parts.append(f"Page {page} of {total_pages}")
+    if page < total_pages:
+        nav_parts.append(
+            f'<a href="/messages?{urlencode({"bundle": bundle.name, "page": page + 1, "page_size": page_size})}">Next</a>'
         )
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Interaction Explorer</title>
@@ -257,12 +317,15 @@ body {{ font-family: sans-serif; margin: 32px; background: #faf7ef; color: #1f29
 .panel {{ max-width: 1200px; background:#fffdf8; border:1px solid #e7e5e4; border-radius:14px; padding:20px 24px; }}
 table {{ width:100%; border-collapse: collapse; }}
 td, th {{ text-align:left; border-top:1px solid #e7e5e4; padding:8px 6px; vertical-align: top; }}
+.nav {{ display:flex; gap:16px; align-items:center; margin: 0 0 16px; }}
 </style></head><body>
 <p><a href="/?bundle={html.escape(bundle.name)}">Back</a></p>
 <div class="panel">
 <h1>Interaction Explorer</h1>
+<p>Messages are ranked by person-related edge signal first, then recency.</p>
+<div class="nav">{"".join(f"<span>{html.escape(part)}</span>" if part.startswith("Page ") else part for part in nav_parts)}</div>
 <table>
-  <thead><tr><th>Subject</th><th>Source</th><th>Timestamp</th><th>Sender</th></tr></thead>
+  <thead><tr><th>Subject</th><th>People</th><th>Signal</th><th>Source</th><th>Timestamp</th><th>Sender</th></tr></thead>
   <tbody>{"".join(rows)}</tbody>
 </table>
 </div></body></html>"""
@@ -326,9 +389,32 @@ code {{ background:#f5f5f4; padding:2px 6px; border-radius:6px; }}
 </div></body></html>"""
 
 
-def render_index_html(base_dir: Path, selected_bundle: Path | None = None, notice: str | None = None) -> str:
+def _parse_positive_int(value: str, default: int) -> int:
+    try:
+        parsed = int(value)
+    except ValueError:
+        return default
+    return parsed if parsed > 0 else default
+
+
+def _owner_mode(value: str | None) -> str:
+    if value in VALID_OWNER_MODES:
+        return value
+    return DEFAULT_OWNER_MODE
+
+
+def render_index_html(
+    base_dir: Path,
+    selected_bundle: Path | None = None,
+    notice: str | None = None,
+    *,
+    owner_person_id: str = "",
+    owner_mode: str = DEFAULT_OWNER_MODE,
+) -> str:
     bundles = discover_bundles(base_dir)
     bundle = selected_bundle or (bundles[0] if bundles else None)
+    owner_person_id = owner_person_id or (get_owner_person_id() or "")
+    owner_mode = _owner_mode(owner_mode)
     people = list_people(bundle / "derived") if bundle and (bundle / "derived").exists() else []
     options = []
     for candidate in bundles:
@@ -343,6 +429,15 @@ def render_index_html(base_dir: Path, selected_bundle: Path | None = None, notic
         )
     notice_html = f'<p class="notice">{html.escape(notice)}</p>' if notice else ""
     selected_name = bundle.name if bundle else ""
+    graph_query = {"bundle": selected_name}
+    if owner_person_id:
+        graph_query["owner_person_id"] = owner_person_id
+    if owner_mode != DEFAULT_OWNER_MODE:
+        graph_query["owner_mode"] = owner_mode
+    owner_options = []
+    for mode in VALID_OWNER_MODES:
+        selected = " selected" if mode == owner_mode else ""
+        owner_options.append(f'<option value="{mode}"{selected}>{mode}</option>')
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -373,12 +468,23 @@ def render_index_html(base_dir: Path, selected_bundle: Path | None = None, notic
       </div>
     </form>
     <div class="row">
-      <a class="button" href="/graph?{urlencode({'bundle': selected_name})}">Open Full Graph</a>
+      <a class="button" href="/graph?{urlencode(graph_query)}">Open Full Graph</a>
       <a class="button" href="/messages?{urlencode({'bundle': selected_name})}">Interaction Explorer</a>
       <a class="button secondary" href="/">Reload Page</a>
     </div>
+    <form method="get" action="/">
+      <input type="hidden" name="bundle" value="{html.escape(selected_name)}">
+      <label for="owner_person_id">Owner Controls</label>
+      <div class="row">
+        <input id="owner_person_id" name="owner_person_id" list="people" value="{html.escape(owner_person_id)}" placeholder="Optional owner person_id">
+        <select id="owner_mode" name="owner_mode">{"".join(owner_options)}</select>
+        <button type="submit" class="secondary">Apply Owner Mode</button>
+      </div>
+    </form>
     <form method="get" action="/ego">
       <input type="hidden" name="bundle" value="{html.escape(selected_name)}">
+      <input type="hidden" name="owner_person_id" value="{html.escape(owner_person_id)}">
+      <input type="hidden" name="owner_mode" value="{html.escape(owner_mode)}">
       <label for="person_id">Ego Person</label>
       <div class="row">
         <input id="person_id" name="person_id" list="people" placeholder="Enter person_id">
@@ -410,21 +516,40 @@ def make_handler(base_dir: Path) -> type[BaseHTTPRequestHandler]:
             bundle = bundles.get(params.get("bundle", [""])[0])
             if parsed.path == "/":
                 notice = params.get("notice", [""])[0] or None
-                self._send_html(render_index_html(base_dir, bundle, notice))
+                owner_person_id = params.get("owner_person_id", [""])[0] or (get_owner_person_id() or "")
+                owner_mode = _owner_mode(params.get("owner_mode", [DEFAULT_OWNER_MODE])[0])
+                self._send_html(
+                    render_index_html(
+                        base_dir,
+                        bundle,
+                        notice,
+                        owner_person_id=owner_person_id,
+                        owner_mode=owner_mode,
+                    )
+                )
                 return
             if parsed.path == "/graph":
                 if bundle is None:
                     self.send_error(HTTPStatus.BAD_REQUEST, "Unknown bundle")
                     return
+                owner_person_id = params.get("owner_person_id", [""])[0] or get_owner_person_id()
+                owner_mode = _owner_mode(params.get("owner_mode", [DEFAULT_OWNER_MODE])[0])
                 graph_path = base_dir / "analysis" / f"{bundle.name}_graph.html"
-                render_graph(bundle / "derived", graph_path)
+                render_graph(
+                    bundle / "derived",
+                    graph_path,
+                    owner_person_id=owner_person_id,
+                    owner_mode=owner_mode,
+                )
                 self._send_file(graph_path)
                 return
             if parsed.path == "/messages":
                 if bundle is None:
                     self.send_error(HTTPStatus.BAD_REQUEST, "Unknown bundle")
                     return
-                self._send_html(render_messages_page(bundle))
+                page = _parse_positive_int(params.get("page", ["1"])[0] or "1", 1)
+                page_size = _parse_positive_int(params.get("page_size", ["100"])[0] or "100", 100)
+                self._send_html(render_messages_page(bundle, page=page, page_size=page_size))
                 return
             if parsed.path == "/message":
                 message_id = params.get("message_id", [""])[0]
@@ -448,8 +573,16 @@ def make_handler(base_dir: Path) -> type[BaseHTTPRequestHandler]:
                 if bundle is None or not person_id:
                     self.send_error(HTTPStatus.BAD_REQUEST, "Missing bundle or person_id")
                     return
+                owner_person_id = params.get("owner_person_id", [""])[0] or get_owner_person_id()
+                owner_mode = _owner_mode(params.get("owner_mode", [DEFAULT_OWNER_MODE])[0])
                 ego_path = base_dir / "analysis" / f"{bundle.name}_{person_id}_ego.html"
-                render_ego_graph(bundle / "derived", person_id, ego_path)
+                render_ego_graph(
+                    bundle / "derived",
+                    person_id,
+                    ego_path,
+                    owner_person_id=owner_person_id,
+                    owner_mode=owner_mode,
+                )
                 self._send_file(ego_path)
                 return
             self.send_error(HTTPStatus.NOT_FOUND)
