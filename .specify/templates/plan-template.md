@@ -31,7 +31,14 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- Spec exists and is current for the work described in this plan.
+- Approach uses the simplest design that satisfies the current documented
+  requirement; any extra complexity is listed in Complexity Tracking with a
+  rejected simpler alternative.
+- Local tests required for this change are identified, including the commands
+  that must pass before deployment.
+- Documentation updates required by behavior changes are identified and scoped.
+- Architectural changes identify the decision record to create or amend.
 
 ## Project Structure
 

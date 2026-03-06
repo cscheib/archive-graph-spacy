@@ -5,6 +5,10 @@
 **Status**: Draft  
 **Input**: User description: "$ARGUMENTS"
 
+**Implementation Readiness**: This spec MUST be complete before implementation
+begins. If behavior changes later, update this spec in the same commit as the
+code change.
+
 ## User Scenarios & Testing *(mandatory)*
 
 <!--
@@ -99,6 +103,22 @@
 
 - **[Entity 1]**: [What it represents, key attributes without implementation]
 - **[Entity 2]**: [What it represents, relationships to other entities]
+
+## Documentation Impact *(mandatory)*
+
+- **Docs to Update**: [List affected files such as quickstarts, READMEs, API
+  usage docs, or state N/A]
+- **Behavior Change Summary**: [Describe what documentation must change to stay
+  aligned with the implementation]
+- **Local Test Plan**: [List the local automated tests that must be added or run
+  before deployment]
+
+## Decision Record Impact *(mandatory)*
+
+- **ADR Required**: [Yes/No]
+- **ADR Path**: [If yes, path to the decision record file]
+- **Architectural Scope**: [State what structural decision is being introduced
+  or confirm that the change is not architectural]
 
 ## Success Criteria *(mandatory)*
 
