@@ -1,0 +1,2 @@
+{"message_id":"m-001","source":"email","sender":"carol@example.com","recipients":["alice@example.com"],"subject":"Dinner with Bob","body":"Hi Alice, can you ask Bob Example to call me at +1 555 000 1002?"}
+{"message_id":"m-002","source":"chat","sender":"alice@example.com","recipients":["bob@example.com"],"subject":"","body":"Bob Example said Carol will email tomorrow."}

@@ -22,6 +22,11 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+notebooks/.ipynb_checkpoints/
 *.py[cod]
 !.python-version
 !uv.lock
+
+# Local experiment data
+data_exports/
+data_samples/*.generated.jsonl

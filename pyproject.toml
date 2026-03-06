@@ -5,6 +5,8 @@ description = "spaCy-based named entity recognition utilities for archive graph 
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 dependencies = [
+  "duckdb>=1.2,<2.0",
+  "pyvis>=0.3.2,<0.4",
   "spacy>=3.8,<4.0",
 ]
 

@@ -1,6 +1,7 @@
 # Archive Graph Spacy
 
-Minimal Python project setup for named entity recognition work with spaCy.
+Experimental spaCy and entity-linking workspace for analysis on exports from
+`graph-data`.
 
 ## Tooling
 
@@ -8,12 +9,27 @@ Minimal Python project setup for named entity recognition work with spaCy.
 - Python is pinned to `3.12` because spaCy support typically lags the newest
   CPython release.
 
+## Purpose
+
+This repository is not the system of record. `graph-data` owns canonical
+entities, ingestion, and the durable graph. This repo is for testing:
+
+- mention extraction from message text
+- candidate linking from mentions to canonical people
+- scoring and evaluation on exported snapshots
+- analysis of failure modes before changes flow back to the main project
+
 ## Quickstart
 
 ```bash
 uv python install 3.12
-uv sync
+uv sync --dev
 uv run pytest
+uv run python -m archive_graph_spacy.scripts.run_sample data_samples/sample_messages.jsonl
+uv run python -m archive_graph_spacy.scripts.run_export data_exports/graph-data-sample
+uv run python -m archive_graph_spacy.scripts.build_edges data_exports/graph-data-sample
+uv run python -m archive_graph_spacy.scripts.query_edges data_exports/graph-data-sample/derived --query top_pairs
+uv run python -m archive_graph_spacy.scripts.visualize_ego data_exports/graph-data-sample/derived p-alice
 ```
 
 ## Install a spaCy model
@@ -25,16 +41,96 @@ uv run python -m spacy download en_core_web_sm
 ## Project layout
 
 ```text
-src/archive_graph_spacy/   # Project package
-tests/                     # Local automated tests
+src/archive_graph_spacy/io.py          # Export-loading helpers
+src/archive_graph_spacy/extract/       # Mention extraction logic
+src/archive_graph_spacy/link/          # Candidate entity linking
+src/archive_graph_spacy/evaluate/      # Metrics and scoring
+src/archive_graph_spacy/scripts/       # Small experiment entrypoints
+data_samples/                          # Small checked-in redacted fixtures
+tests/                                 # Local automated tests
 ```
 
-## Current scope
+## Export workflow
 
-The initial package includes:
+1. Export a small message/contact snapshot from `graph-data`.
+2. Normalize it into the schemas used in `archive_graph_spacy.io`.
+3. Run extraction and linking experiments here.
+4. Review scored results before deciding what belongs in the main project.
 
-- a helper to build a blank English pipeline with an NER component
-- a helper to extract entity spans from a processed `Doc`
+Example export command from `graph-data`:
 
-As the project grows, add training configs, data assets, and decision records
-only when there is a current documented need.
+```bash
+uv run python scripts/export_spacy_snapshot.py \
+  /Users/chris/src/archive-graph-spacy/data_exports/graph-data-sample \
+  --people-limit 250 \
+  --message-limit 1000
+```
+
+This writes:
+
+```text
+data_exports/graph-data-sample/
+├── contacts.jsonl
+└── messages.jsonl
+```
+
+To build queryable person-message edges from that bundle:
+
+```bash
+uv run python -m archive_graph_spacy.scripts.build_edges data_exports/graph-data-sample
+```
+
+The emitted rows distinguish explicit metadata edges (`sender`, `recipient`)
+from inferred mention edges (`mentioned`).
+
+The command now returns two views:
+
+- `person_message_edges`: one aggregated row per `(person_id, message_id, role)`
+- `person_message_edge_evidence`: the supporting evidence rows used to build
+  those aggregates
+- `person_person_edges`: one aggregated row per person-pair across messages
+- `person_person_edge_evidence`: the message-level evidence rows behind those
+  person-pair relationships
+
+It also writes persistent JSONL tables under:
+
+```text
+data_exports/<bundle>/derived/
+```
+
+You can inspect them quickly with DuckDB:
+
+```bash
+uv run python -m archive_graph_spacy.scripts.query_edges \
+  data_exports/graph-data-sample/derived \
+  --query top_pairs
+```
+
+And render a small ego-network HTML view:
+
+```bash
+uv run python -m archive_graph_spacy.scripts.visualize_ego \
+  data_exports/graph-data-sample/derived \
+  p-alice \
+  --output analysis/ego_p_alice.html
+```
+
+To render the whole person-only network instead:
+
+```bash
+uv run python -m archive_graph_spacy.scripts.visualize_graph \
+  data_exports/graph-data-sample/derived \
+  --output analysis/network_graph.html
+```
+
+To browse and refresh these visualizations from a local web app instead of
+running the render scripts manually:
+
+```bash
+uv run python -m archive_graph_spacy.scripts.webapp --port 8000
+```
+
+Then open `http://127.0.0.1:8000/`.
+
+Keep large or sensitive exports out of Git. Use `data_exports/` locally and
+only commit small redacted fixtures under `data_samples/`.
