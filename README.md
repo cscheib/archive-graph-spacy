@@ -17,6 +17,7 @@ entities, ingestion, and the durable graph. This repo is for testing:
 - mention extraction from message text
 - candidate linking from mentions to canonical people
 - scoring and evaluation on exported snapshots
+- local derivation of `nlpdata`-style search tables before Databricks deployment
 - analysis of failure modes before changes flow back to the main project
 
 ## Quickstart
@@ -25,6 +26,7 @@ entities, ingestion, and the durable graph. This repo is for testing:
 uv python install 3.12
 uv sync --dev
 uv run pytest
+uv run python -m archive_graph_spacy.scripts.build_nlpdata data_samples
 uv run python -m archive_graph_spacy.scripts.run_sample data_samples/sample_messages.jsonl
 uv run python -m archive_graph_spacy.scripts.run_export data_exports/graph-data-sample
 uv run python -m archive_graph_spacy.scripts.build_edges data_exports/graph-data-sample
@@ -62,6 +64,7 @@ uv run python -m spacy download en_core_web_sm
 
 ```text
 src/archive_graph_spacy/io.py          # Export-loading helpers
+src/archive_graph_spacy/nlpdata/       # Derived search-workspace pipeline
 src/archive_graph_spacy/extract/       # Mention extraction logic
 src/archive_graph_spacy/link/          # Candidate entity linking
 src/archive_graph_spacy/evaluate/      # Metrics and scoring
@@ -99,6 +102,50 @@ To build queryable person-message edges from that bundle:
 ```bash
 uv run python -m archive_graph_spacy.scripts.build_edges data_exports/graph-data-sample
 ```
+
+To build local `nlpdata` tables from the same bundle:
+
+```bash
+uv run python -m archive_graph_spacy.scripts.build_nlpdata data_exports/graph-data-sample
+```
+
+This writes:
+
+```text
+data_exports/<bundle>/derived/nlpdata/
+├── nlp_runs.jsonl
+├── message_mentions.jsonl
+├── message_person_links.jsonl
+├── message_theme_tags.jsonl
+└── message_search_docs.jsonl
+```
+
+To stage and deploy those derived tables into Databricks:
+
+```bash
+uv run python -m archive_graph_spacy.scripts.build_nlpdata \
+  data_exports/graph-data-sample \
+  --deploy \
+  --profile cscheib-free-ws \
+  --catalog personal_archive_dev \
+  --schema nlpdata
+```
+
+This uses the local Databricks CLI for auth and DBFS staging, then writes Delta
+tables through the SQL Statements API.
+
+For managed Databricks assets and deployment, this repo now includes a
+Databricks Asset Bundle:
+
+```bash
+databricks bundle validate -t dev
+databricks bundle deploy -t dev
+databricks bundle run -t dev nlpdata_refresh
+```
+
+The bundle deploys the project wheel plus a notebook-driven refresh job that
+reads directly from `personal_archive_dev.gold` and `personal_archive_dev.memory`
+and writes `personal_archive_dev.nlpdata`.
 
 The emitted rows distinguish explicit metadata edges (`sender`, `recipient`)
 from inferred mention edges (`mentioned`).
