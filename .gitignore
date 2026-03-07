@@ -30,4 +30,5 @@ notebooks/.ipynb_checkpoints/
 
 # Local experiment data
 data_exports/
+analysis/
 data_samples/*.generated.jsonl
