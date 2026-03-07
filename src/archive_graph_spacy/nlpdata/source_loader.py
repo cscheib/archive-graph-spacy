@@ -97,6 +97,19 @@ def _message_from_row(row: dict[str, object]) -> Message:
     )
 
 
+def source_bundle_from_rows(
+    contacts_rows: list[dict[str, object]],
+    message_rows: list[dict[str, object]],
+) -> SourceBundle:
+    contacts = tuple(
+        _contact_from_row(row)
+        for row in contacts_rows
+        if row.get("person_id") and row.get("display_name")
+    )
+    messages = tuple(_message_from_row(row) for row in message_rows if row.get("message_id"))
+    return SourceBundle(contacts=contacts, messages=messages)
+
+
 def load_source_bundle_from_databricks(
     *,
     catalog: str,
@@ -138,7 +151,6 @@ def load_source_bundle_from_databricks(
         {message_limit_sql}
     """
     messages_rows = client.fetch_all(messages_query)
-    messages = tuple(_message_from_row(row) for row in messages_rows if row.get("message_id"))
 
     people_limit_sql = f"LIMIT {people_limit}" if people_limit is not None else ""
     contacts_query = f"""
@@ -157,13 +169,7 @@ def load_source_bundle_from_databricks(
         {people_limit_sql}
     """
     contacts_rows = client.fetch_all(contacts_query)
-
-    contacts = tuple(
-        _contact_from_row(row)
-        for row in contacts_rows
-        if row.get("person_id") and row.get("display_name")
-    )
-    return SourceBundle(contacts=contacts, messages=messages)
+    return source_bundle_from_rows(contacts_rows, messages_rows)
 
 
 def contact_index(contacts: tuple[Contact, ...]) -> dict[str, Contact]:

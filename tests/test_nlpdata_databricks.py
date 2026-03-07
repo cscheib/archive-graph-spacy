@@ -56,3 +56,43 @@ def test_sql_client_raises_on_failed_statement() -> None:
 
     with pytest.raises(DatabricksSqlError, match="boom"):
         client.execute("SELECT 1")
+
+
+def test_sql_client_polls_pending_statement_until_success() -> None:
+    pending = SimpleNamespace(
+        statement_id="stmt-1",
+        status=SimpleNamespace(state=SimpleNamespace(value="PENDING")),
+    )
+    succeeded = SimpleNamespace(
+        statement_id="stmt-1",
+        status=SimpleNamespace(state=SimpleNamespace(value="SUCCEEDED")),
+        manifest=SimpleNamespace(schema=SimpleNamespace(columns=[])),
+        result=SimpleNamespace(data_array=[], next_chunk_internal_link=None),
+    )
+    calls = {"count": 0}
+
+    def execute_statement(**kwargs):
+        return pending
+
+    def get_statement(statement_id):
+        calls["count"] += 1
+        return succeeded
+
+    workspace_client = SimpleNamespace(
+        statement_execution=SimpleNamespace(
+            execute_statement=execute_statement,
+            get_statement=get_statement,
+        )
+    )
+
+    client = DatabricksSqlClient(
+        workspace_client,
+        warehouse_id="warehouse-1",
+        poll_interval_seconds=0.0,
+        timeout_seconds=1.0,
+    )
+
+    result = client.execute("SELECT 1")
+
+    assert result is succeeded
+    assert calls["count"] == 1

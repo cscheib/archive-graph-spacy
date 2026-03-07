@@ -34,23 +34,82 @@ else:
 from archive_graph_spacy.nlpdata.contracts import TABLE_CONTRACTS
 from archive_graph_spacy.nlpdata.deploy import CURRENT_STATE_TABLES, TABLE_DDLS
 from archive_graph_spacy.nlpdata.pipeline import run_pipeline
-from archive_graph_spacy.nlpdata.source_loader import load_source_bundle_from_databricks
+from archive_graph_spacy.nlpdata.source_loader import source_bundle_from_rows
 
 catalog = dbutils.widgets.get("catalog") or "personal_archive_dev"
 schema = dbutils.widgets.get("schema") or "nlpdata"
-warehouse_id = dbutils.widgets.get("warehouse_id") or "4b799682f2bfd311"
 message_limit = dbutils.widgets.get("message_limit").strip()
 people_limit = dbutils.widgets.get("people_limit").strip()
 start_date = dbutils.widgets.get("start_date").strip() or None
 end_date = dbutils.widgets.get("end_date").strip() or None
 
-bundle = load_source_bundle_from_databricks(
-    catalog=catalog,
-    warehouse_id=warehouse_id,
-    message_limit=int(message_limit) if message_limit else None,
-    people_limit=int(people_limit) if people_limit else None,
-    start_date=start_date,
-    end_date=end_date,
+interaction_types = (
+    "email",
+    "chat",
+    "fb_message",
+    "dating_notification",
+    "linkedin_notification",
+    "payment_notification",
+)
+quoted_types = ", ".join(f"'{value}'" for value in interaction_types)
+
+message_predicates = [
+    f"i.interaction_type IN ({quoted_types})",
+    "COALESCE(i.preview, i.subject) IS NOT NULL",
+]
+if start_date:
+    message_predicates.append(f"i.timestamp >= '{start_date}'")
+if end_date:
+    message_predicates.append(f"i.timestamp < '{end_date}'")
+message_where = " AND ".join(message_predicates)
+message_limit_sql = f"LIMIT {int(message_limit)}" if message_limit else ""
+
+message_rows = [
+    row.asDict(recursive=True)
+    for row in spark.sql(
+        f"""
+        SELECT
+          i.global_interaction_id AS message_id,
+          COALESCE(i.source, i.interaction_type) AS source,
+          i.from_email AS sender,
+          i.to_email AS recipients,
+          i.subject,
+          COALESCE(i.preview, i.subject, '') AS body,
+          CAST(i.timestamp AS STRING) AS timestamp,
+          i.interaction_type
+        FROM {catalog}.gold.interactions i
+        WHERE {message_where}
+        ORDER BY i.timestamp DESC NULLS LAST, i.global_interaction_id
+        {message_limit_sql}
+        """
+    ).collect()
+]
+
+people_limit_sql = f"LIMIT {int(people_limit)}" if people_limit else ""
+contact_rows = [
+    row.asDict(recursive=True)
+    for row in spark.sql(
+        f"""
+        SELECT
+          p.person_id,
+          p.canonical_name AS display_name,
+          p.emails,
+          p.phones,
+          p.photo_url,
+          COALESCE(o.entity_type_override, c.entity_type, 'unknown') AS entity_type
+        FROM {catalog}.gold.persons p
+        LEFT JOIN {catalog}.memory.entity_overrides o ON p.person_id = o.person_id
+        LEFT JOIN {catalog}.gold.entity_classification c ON p.person_id = c.person_id
+        WHERE COALESCE(p.canonical_person_id, p.person_id) = p.person_id
+        ORDER BY COALESCE(p.interaction_count, 0) DESC, p.person_id
+        {people_limit_sql}
+        """
+    ).collect()
+]
+
+bundle = source_bundle_from_rows(
+    contact_rows,
+    message_rows,
 )
 result = run_pipeline(bundle, run_scope=f"{catalog}.gold", source_catalog=catalog)
 

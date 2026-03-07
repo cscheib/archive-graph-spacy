@@ -144,8 +144,8 @@ databricks bundle run -t dev nlpdata_refresh
 ```
 
 The bundle deploys the project wheel plus a notebook-driven refresh job that
-reads directly from `personal_archive_dev.gold` and `personal_archive_dev.memory`
-and writes `personal_archive_dev.nlpdata`.
+uses Spark SQL to read directly from `personal_archive_dev.gold` and
+`personal_archive_dev.memory`, then writes `personal_archive_dev.nlpdata`.
 
 The emitted rows distinguish explicit metadata edges (`sender`, `recipient`)
 from inferred mention edges (`mentioned`).

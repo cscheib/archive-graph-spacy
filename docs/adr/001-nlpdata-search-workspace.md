@@ -26,6 +26,11 @@ The first rollout is intentionally narrow:
 - deterministic theme tagging and confidence-based suppression
 - run metadata for every refresh
 
+For Databricks-managed refreshes, source reads and table writes run inside the
+Databricks job with Spark SQL. The Databricks SDK remains limited to control
+plane work such as lightweight validation, orchestration, and bundle-adjacent
+queries.
+
 ## Consequences
 
 Positive:
@@ -35,6 +40,8 @@ Positive:
 - preserves provenance and rerun traceability
 - reuses existing extraction/linking code rather than introducing a second NLP
   stack
+- avoids SQL Statements API inline result limits during large source reads by
+  using Spark SQL in the job runtime
 
 Negative:
 
@@ -43,6 +50,8 @@ Negative:
 - thread-level retrieval remains out of scope in v1
 - deterministic theme tags will need later review if broader semantic coverage
   becomes necessary
+- Databricks refresh logic now has two execution surfaces to maintain:
+  local Python validation and Spark-based bundle execution
 
 ## Alternatives Considered
 
@@ -52,3 +61,6 @@ Negative:
   - rejected due to privacy, storage, and drift concerns
 - Build thread-level search documents in v1
   - rejected as premature complexity
+- Read large source slices through the Databricks SQL Statements API
+  - rejected because inline result limits and client-side result shipping are a
+    poor fit for full-refresh or yearly backfill workloads

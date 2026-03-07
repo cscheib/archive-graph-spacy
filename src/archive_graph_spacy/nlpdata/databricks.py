@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -29,9 +30,18 @@ def get_workspace_client(profile: str | None = None) -> "WorkspaceClient":
 
 
 class DatabricksSqlClient:
-    def __init__(self, workspace_client: "WorkspaceClient", warehouse_id: str) -> None:
+    def __init__(
+        self,
+        workspace_client: "WorkspaceClient",
+        warehouse_id: str,
+        *,
+        poll_interval_seconds: float = 1.0,
+        timeout_seconds: float = 300.0,
+    ) -> None:
         self.workspace_client = workspace_client
         self.warehouse_id = warehouse_id
+        self.poll_interval_seconds = poll_interval_seconds
+        self.timeout_seconds = timeout_seconds
 
     def execute(self, statement: str) -> Any:
         result = self.workspace_client.statement_execution.execute_statement(
@@ -49,7 +59,32 @@ class DatabricksSqlClient:
             error = getattr(status, "error", None)
             message = getattr(error, "message", None) or "Databricks SQL execution failed"
             raise DatabricksSqlError(message)
-        return result
+        if state == "SUCCEEDED":
+            return result
+
+        statement_id = getattr(result, "statement_id", None)
+        if not statement_id:
+            raise DatabricksSqlError("Databricks SQL statement did not return a statement_id")
+
+        deadline = time.monotonic() + self.timeout_seconds
+        while time.monotonic() < deadline:
+            result = self.workspace_client.statement_execution.get_statement(statement_id)
+            try:
+                setattr(result, "_client", self.workspace_client)
+            except Exception:
+                pass
+            status = getattr(result, "status", None)
+            state = getattr(getattr(status, "state", None), "value", None)
+            if state == "SUCCEEDED":
+                return result
+            if state == "FAILED":
+                error = getattr(status, "error", None)
+                message = getattr(error, "message", None) or "Databricks SQL execution failed"
+                raise DatabricksSqlError(message)
+            if state in {"CANCELED", "CLOSED"}:
+                raise DatabricksSqlError(f"Databricks SQL statement ended in state {state}")
+            time.sleep(self.poll_interval_seconds)
+        raise DatabricksSqlError("Timed out waiting for Databricks SQL statement completion")
 
     def fetch_all(self, statement: str) -> list[dict[str, Any]]:
         return rows_from_result(self.execute(statement))
