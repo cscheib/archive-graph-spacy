@@ -64,3 +64,6 @@ Negative:
 - Read large source slices through the Databricks SQL Statements API
   - rejected because inline result limits and client-side result shipping are a
     poor fit for full-refresh or yearly backfill workloads
+- Require operators to launch each historical backfill window manually
+  - rejected because the agreed date windows are deterministic and should be
+    expressed as a bundle-managed sequential job

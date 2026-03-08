@@ -63,6 +63,12 @@ The bundle-managed refresh uses Spark SQL for source reads and writes inside
 Databricks. Use the SDK/SQL Statements path only for small validation queries,
 not for full backfills.
 
+For the agreed historical backfill plan, run the canned sequential bundle job:
+
+```bash
+databricks bundle run -t dev nlpdata_backfill
+```
+
 ## 5. Post-Deployment Validation
 
 After deployment, validate:

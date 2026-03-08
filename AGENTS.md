@@ -88,6 +88,8 @@ the change.
 ## Active Technologies
 - Python 3.12 for local validation and pipeline development + spaCy, pytest, Databricks Workspace/SQL client, Delta tables (001-nlpdata-schema)
 - Databricks Delta tables in `personal_archive_dev.nlpdata`; source inputs from `personal_archive_dev.gold` and `personal_archive_dev.memory` (001-nlpdata-schema)
+- Markdown-first planning artifacts for a Python 3.12 repository + Existing repo docs/spec workflow, pytest, `uv`, GitHub issues/projects (002-formalize-cross-repo-contract)
+- Markdown specs under `specs/`; ADRs under `docs/adr/` (002-formalize-cross-repo-contract)
 
 ## Recent Changes
 - 001-nlpdata-schema: Added the local `nlpdata` pipeline, builder CLI, run metadata, and message-level search workspace contracts

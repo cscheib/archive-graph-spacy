@@ -20,6 +20,19 @@ entities, ingestion, and the durable graph. This repo is for testing:
 - local derivation of `nlpdata`-style search tables before Databricks deployment
 - analysis of failure modes before changes flow back to the main project
 
+## Cross-Repo Contract
+
+The shared boundary between `archive-graph-data` and `archive-graph-spacy` is
+published here:
+
+- [Cross-Repo Contract Spec](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/spec.md)
+- [Cross-Repo Boundary Contract](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/contracts/cross-repo-boundary.md)
+- [ADR 002: Cross-Repo Contract](/Users/chris/src/archive-graph-spacy/docs/adr/002-cross-repo-contract.md)
+
+Use those documents as the source of truth for ownership, join semantics,
+provenance, reviewed assertions, and promotion boundaries instead of repeating
+that logic in local notes or issue bodies.
+
 ## Quickstart
 
 ```bash
@@ -146,6 +159,25 @@ databricks bundle run -t dev nlpdata_refresh
 The bundle deploys the project wheel plus a notebook-driven refresh job that
 uses Spark SQL to read directly from `personal_archive_dev.gold` and
 `personal_archive_dev.memory`, then writes `personal_archive_dev.nlpdata`.
+
+For the agreed historical backfill windows, use the canned sequential job:
+
+```bash
+databricks bundle run -t dev nlpdata_backfill
+```
+
+That job runs these windows in order:
+- `1974-01-01` to `2013-01-01`
+- `2013-01-01` to `2017-07-01`
+- `2017-07-01` to `2018-07-01`
+- `2018-07-01` to `2019-07-01`
+- `2019-07-01` to `2020-07-01`
+- `2020-07-01` to `2021-07-01`
+- `2021-07-01` to `2022-07-01`
+- `2022-07-01` to `2023-07-01`
+- `2023-07-01` to `2024-07-01`
+- `2024-07-01` to `2025-07-01`
+- `2025-07-01` to `2026-07-01`
 
 The emitted rows distinguish explicit metadata edges (`sender`, `recipient`)
 from inferred mention edges (`mentioned`).

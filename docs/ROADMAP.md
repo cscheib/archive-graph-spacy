@@ -17,6 +17,9 @@ That project now owns the active planning backlog across:
 
 - roadmap sequencing should be maintained in the GitHub Project
 - planning details should live in linked GitHub issues
+- the shared cross-repo contract is published in
+  [specs/002-formalize-cross-repo-contract/spec.md](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/spec.md)
+  and [docs/adr/002-cross-repo-contract.md](/Users/chris/src/archive-graph-spacy/docs/adr/002-cross-repo-contract.md)
 - this file is retained only as a pointer for future readers
 
 ## Current Planning Focus
