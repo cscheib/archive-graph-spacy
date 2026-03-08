@@ -9,7 +9,7 @@ from pathlib import Path
 from archive_graph_spacy.io import load_export_bundle
 from archive_graph_spacy.models import Contact, Message
 
-from .databricks import DatabricksSqlClient, get_workspace_client
+from .databricks import DatabricksSqlClient, get_workspace_client, quote_sql_identifier
 from .models import SourceBundle
 
 DEFAULT_WAREHOUSE_ID = "4b799682f2bfd311"
@@ -122,6 +122,7 @@ def load_source_bundle_from_databricks(
     interaction_types: tuple[str, ...] = DEFAULT_INTERACTION_TYPES,
 ) -> SourceBundle:
     client = DatabricksSqlClient(get_workspace_client(profile), warehouse_id)
+    quoted_catalog = quote_sql_identifier(catalog)
     quoted_types = ", ".join(_quote_sql_string(value) for value in interaction_types)
 
     predicates = [
@@ -145,7 +146,7 @@ def load_source_bundle_from_databricks(
             COALESCE(i.preview, i.subject, '') AS body,
             CAST(i.timestamp AS STRING) AS timestamp,
             i.interaction_type
-        FROM {catalog}.gold.interactions i
+        FROM {quoted_catalog}.gold.interactions i
         WHERE {message_where}
         ORDER BY i.timestamp DESC NULLS LAST, i.global_interaction_id
         {message_limit_sql}
@@ -161,9 +162,9 @@ def load_source_bundle_from_databricks(
             p.phones,
             p.photo_url,
             COALESCE(o.entity_type_override, c.entity_type, 'unknown') AS entity_type
-        FROM {catalog}.gold.persons p
-        LEFT JOIN {catalog}.memory.entity_overrides o ON p.person_id = o.person_id
-        LEFT JOIN {catalog}.gold.entity_classification c ON p.person_id = c.person_id
+        FROM {quoted_catalog}.gold.persons p
+        LEFT JOIN {quoted_catalog}.memory.entity_overrides o ON p.person_id = o.person_id
+        LEFT JOIN {quoted_catalog}.gold.entity_classification c ON p.person_id = c.person_id
         WHERE COALESCE(p.canonical_person_id, p.person_id) = p.person_id
         ORDER BY COALESCE(p.interaction_count, 0) DESC, p.person_id
         {people_limit_sql}

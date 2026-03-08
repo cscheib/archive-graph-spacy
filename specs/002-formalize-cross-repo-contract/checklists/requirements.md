@@ -2,7 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-03-08
-**Feature**: [spec.md](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/spec.md)
+**Feature**: [spec.md](../spec.md)
 
 ## Content Quality
 
@@ -31,6 +31,6 @@
 
 ## Notes
 
-- Validated on 2026-03-08 against [spec.md](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/spec.md).
+- Validated on 2026-03-08 against [spec.md](../spec.md).
 - Passed on the first validation iteration; no clarification markers or quality gaps remain.
 - Revalidated on 2026-03-08 after task, quickstart, ADR, README, and roadmap alignment updates; all checklist items still pass.

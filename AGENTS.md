@@ -28,7 +28,7 @@ not source material.
   `personal_archive_dev.nlpdata` Delta tables through the Databricks SQL
   Statements API.
 - `databricks bundle validate -t dev`:
-  validate the Databricks Asset Bundle in [databricks.yml](/Users/chris/src/archive-graph-spacy/databricks.yml).
+  validate the Databricks Asset Bundle in [databricks.yml](databricks.yml).
 - `databricks bundle deploy -t dev`:
   deploy the project wheel and `nlpdata_refresh` job resources to Databricks.
 - `databricks bundle run -t dev nlpdata_refresh`:

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from archive_graph_spacy.nlpdata.deploy import (
     DEFAULT_CATALOG,
     DEFAULT_SCHEMA,
@@ -85,9 +87,27 @@ def test_deploy_staged_payload_creates_schema_and_merges_current_tables(monkeypa
 
     assert result["catalog"] == DEFAULT_CATALOG
     assert result["schema"] == DEFAULT_SCHEMA
-    assert any("CREATE SCHEMA IF NOT EXISTS personal_archive_dev.nlpdata" in stmt for stmt in sql_client.statements)
-    assert any("CREATE TABLE IF NOT EXISTS personal_archive_dev.nlpdata.message_search_docs" in stmt for stmt in sql_client.statements)
-    assert any("UPDATE personal_archive_dev.nlpdata.message_person_links" in stmt for stmt in sql_client.statements)
-    assert any("UPDATE personal_archive_dev.nlpdata.message_theme_tags" in stmt for stmt in sql_client.statements)
-    assert any("UPDATE personal_archive_dev.nlpdata.message_search_docs" in stmt for stmt in sql_client.statements)
-    assert any("INSERT INTO personal_archive_dev.nlpdata.nlp_runs" in stmt for stmt in sql_client.statements)
+    assert any("CREATE SCHEMA IF NOT EXISTS `personal_archive_dev`.`nlpdata`" in stmt for stmt in sql_client.statements)
+    assert any("CREATE TABLE IF NOT EXISTS `personal_archive_dev`.`nlpdata`.message_search_docs" in stmt for stmt in sql_client.statements)
+    assert any("UPDATE `personal_archive_dev`.`nlpdata`.`message_person_links`" in stmt for stmt in sql_client.statements)
+    assert any("UPDATE `personal_archive_dev`.`nlpdata`.`message_theme_tags`" in stmt for stmt in sql_client.statements)
+    assert any("UPDATE `personal_archive_dev`.`nlpdata`.`message_search_docs`" in stmt for stmt in sql_client.statements)
+    assert any("INSERT INTO `personal_archive_dev`.`nlpdata`.nlp_runs" in stmt for stmt in sql_client.statements)
+
+
+def test_deploy_staged_payload_rejects_invalid_catalog_identifier(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.get_workspace_client",
+        lambda profile=None: object(),
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.DatabricksSqlClient",
+        lambda workspace_client, warehouse_id: FakeSqlClient(),
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.stage_payload_directory",
+        lambda local_dir, run_id, profile=None: "dbfs:/tmp/archive_graph_spacy/nlpdata/run-123",
+    )
+
+    with pytest.raises(ValueError, match="Invalid SQL identifier"):
+        deploy_staged_payload(tmp_path, run_id="run-123", catalog="personal_archive_dev;DROP SCHEMA x")

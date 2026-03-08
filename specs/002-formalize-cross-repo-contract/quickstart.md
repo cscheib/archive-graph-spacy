@@ -24,11 +24,11 @@ follow-up notes before treating the contract as implementation-ready.
 
 Confirm the feature artifacts are internally consistent:
 
-- [spec.md](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/spec.md)
-- [plan.md](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/plan.md)
-- [research.md](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/research.md)
-- [data-model.md](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/data-model.md)
-- [cross-repo-boundary.md](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/contracts/cross-repo-boundary.md)
+- [spec.md](spec.md)
+- [plan.md](plan.md)
+- [research.md](research.md)
+- [data-model.md](data-model.md)
+- [cross-repo-boundary.md](contracts/cross-repo-boundary.md)
 
 Verify that all five decisions remain true:
 
@@ -49,8 +49,8 @@ Before implementation, confirm the architectural decision record path and
 roadmap references are aligned:
 
 - ADR path: `docs/adr/002-cross-repo-contract.md`
-- Roadmap pointer: [docs/ROADMAP.md](/Users/chris/src/archive-graph-spacy/docs/ROADMAP.md)
-- Active feature spec: [spec.md](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/spec.md)
+- Roadmap pointer: [docs/ROADMAP.md](../../docs/ROADMAP.md)
+- Active feature spec: [spec.md](spec.md)
 
 Dependent issues should reference this contract rather than redefining
 ownership or join semantics locally.

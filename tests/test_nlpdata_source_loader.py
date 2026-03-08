@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from archive_graph_spacy.nlpdata.source_loader import load_source_bundle_from_databricks
 
 
@@ -10,9 +12,9 @@ class FakeSqlClient:
 
     def fetch_all(self, statement: str):
         self.queries.append(statement)
-        if "FROM personal_archive_dev.gold.interactions" in statement:
+        if "FROM `personal_archive_dev`.gold.interactions" in statement:
             return self.rows["messages"]
-        if "FROM personal_archive_dev.gold.persons" in statement:
+        if "FROM `personal_archive_dev`.gold.persons" in statement:
             return self.rows["contacts"]
         raise AssertionError(f"Unexpected query: {statement}")
 
@@ -67,3 +69,17 @@ def test_load_source_bundle_from_databricks_maps_rows(monkeypatch) -> None:
     assert bundle.messages[0].recipients == ("bob@example.com",)
     assert any("LIMIT 100" in query for query in fake_client.queries)
     assert any("LIMIT 200" in query for query in fake_client.queries)
+
+
+def test_load_source_bundle_from_databricks_rejects_invalid_catalog(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.source_loader.get_workspace_client",
+        lambda profile=None: SimpleNamespace(),
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.source_loader.DatabricksSqlClient",
+        lambda workspace_client, warehouse_id: FakeSqlClient({"messages": [], "contacts": []}),
+    )
+
+    with pytest.raises(ValueError, match="Invalid SQL identifier"):
+        load_source_bundle_from_databricks(catalog="personal_archive_dev;DROP TABLE gold.interactions")

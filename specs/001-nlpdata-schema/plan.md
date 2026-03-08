@@ -1,7 +1,7 @@
 # Implementation Plan: NLP Search Workspace
 
-**Branch**: `001-nlpdata-schema` | **Date**: 2026-03-06 | **Spec**: [spec.md](/Users/chris/src/archive-graph-spacy/specs/001-nlpdata-schema/spec.md)
-**Input**: Feature specification from `/specs/001-nlpdata-schema/spec.md`
+**Branch**: `001-nlpdata-schema` | **Date**: 2026-03-06 | **Spec**: [spec.md](spec.md)
+**Input**: Feature specification from `specs/001-nlpdata-schema/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/plan-template.md` for the execution workflow.
 

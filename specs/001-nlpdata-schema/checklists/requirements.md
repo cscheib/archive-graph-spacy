@@ -3,7 +3,7 @@
 **Purpose**: Validate specification completeness and quality before proceeding
 to planning
 **Created**: 2026-03-06
-**Feature**: [spec.md](/Users/chris/src/archive-graph-spacy/specs/001-nlpdata-schema/spec.md)
+**Feature**: [spec.md](../spec.md)
 
 ## Content Quality
 

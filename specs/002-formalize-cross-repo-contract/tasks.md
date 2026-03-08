@@ -1,7 +1,7 @@
 # Tasks: Cross-Repo Contract
 
 **Input**: Design documents from `/specs/002-formalize-cross-repo-contract/`
-**Prerequisites**: [plan.md](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/plan.md), [spec.md](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/spec.md), [research.md](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/research.md), [data-model.md](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/data-model.md), [contracts/cross-repo-boundary.md](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/contracts/cross-repo-boundary.md)
+**Prerequisites**: [plan.md](plan.md), [spec.md](spec.md), [research.md](research.md), [data-model.md](data-model.md), [contracts/cross-repo-boundary.md](contracts/cross-repo-boundary.md)
 
 **Tests**: Local automated test commands must be identified for any code changes that follow from this contract. For this documentation-first feature, validation tasks focus on spec, ADR, and prerequisite checks.
 
@@ -17,9 +17,9 @@
 
 **Purpose**: Prepare the local feature artifact set and validation scaffolding.
 
-- [x] T001 Verify feature paths and active branch with `.specify/scripts/bash/check-prerequisites.sh --json` for `/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/spec.md`
-- [x] T002 Reconcile the technical context, constraints, and structure summary in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/plan.md]
-- [x] T003 [P] Confirm requirements-checklist coverage in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/checklists/requirements.md]
+- [x] T001 Verify feature paths and active branch with `.specify/scripts/bash/check-prerequisites.sh --json` for `specs/002-formalize-cross-repo-contract/spec.md`
+- [x] T002 Reconcile the technical context, constraints, and structure summary in [specs/002-formalize-cross-repo-contract/plan.md]
+- [x] T003 [P] Confirm requirements-checklist coverage in [specs/002-formalize-cross-repo-contract/checklists/requirements.md]
 
 ---
 
@@ -29,11 +29,11 @@
 
 **⚠️ CRITICAL**: No user story work should be considered complete until this phase is complete.
 
-- [x] T004 Reconcile the ownership, join-key, provenance, and promotion decisions in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/research.md]
-- [x] T005 [P] Reconcile the entity definitions, uniqueness rules, and lifecycle transitions in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/data-model.md]
-- [x] T006 [P] Reconcile the authoritative ownership and interface guarantees in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/contracts/cross-repo-boundary.md]
-- [x] T007 Reconcile the adoption workflow, validation steps, and release gate in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/quickstart.md]
-- [x] T008 Create the architecture decision record in [/Users/chris/src/archive-graph-spacy/docs/adr/002-cross-repo-contract.md]
+- [x] T004 Reconcile the ownership, join-key, provenance, and promotion decisions in [specs/002-formalize-cross-repo-contract/research.md]
+- [x] T005 [P] Reconcile the entity definitions, uniqueness rules, and lifecycle transitions in [specs/002-formalize-cross-repo-contract/data-model.md]
+- [x] T006 [P] Reconcile the authoritative ownership and interface guarantees in [specs/002-formalize-cross-repo-contract/contracts/cross-repo-boundary.md]
+- [x] T007 Reconcile the adoption workflow, validation steps, and release gate in [specs/002-formalize-cross-repo-contract/quickstart.md]
+- [x] T008 Create the architecture decision record in [docs/adr/002-cross-repo-contract.md]
 
 **Checkpoint**: Foundation ready. User story slices can now be completed and validated independently.
 
@@ -47,16 +47,16 @@
 
 ### Validation for User Story 1
 
-- [x] T009 [P] [US1] Validate ownership language and acceptance coverage in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/spec.md]
-- [x] T010 [P] [US1] Validate ownership entities and transitions in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/data-model.md]
+- [x] T009 [P] [US1] Validate ownership language and acceptance coverage in [specs/002-formalize-cross-repo-contract/spec.md]
+- [x] T010 [P] [US1] Validate ownership entities and transitions in [specs/002-formalize-cross-repo-contract/data-model.md]
 
 ### Implementation for User Story 1
 
-- [x] T011 [US1] Document repository ownership for canonical records, derived enrichment, candidate assertions, reviewed assertions, and promoted overrides in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/contracts/cross-repo-boundary.md]
-- [x] T012 [US1] Document the reviewed-assertion handoff boundary in [/Users/chris/src/archive-graph-spacy/docs/adr/002-cross-repo-contract.md]
-- [x] T013 [US1] Update the roadmap pointer and local source-of-truth note in [/Users/chris/src/archive-graph-spacy/docs/ROADMAP.md]
-- [x] T014 [US1] Update repository workflow guidance to reference the shared contract in [/Users/chris/src/archive-graph-spacy/README.md]
-- [x] T015 [US1] Record the publish-once reference model for both repositories in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/contracts/cross-repo-boundary.md]
+- [x] T011 [US1] Document repository ownership for canonical records, derived enrichment, candidate assertions, reviewed assertions, and promoted overrides in [specs/002-formalize-cross-repo-contract/contracts/cross-repo-boundary.md]
+- [x] T012 [US1] Document the reviewed-assertion handoff boundary in [docs/adr/002-cross-repo-contract.md]
+- [x] T013 [US1] Update the roadmap pointer and local source-of-truth note in [docs/ROADMAP.md]
+- [x] T014 [US1] Update repository workflow guidance to reference the shared contract in [README.md]
+- [x] T015 [US1] Record the publish-once reference model for both repositories in [specs/002-formalize-cross-repo-contract/contracts/cross-repo-boundary.md]
 
 **Checkpoint**: User Story 1 is complete when ownership can be determined from the contract and linked local docs alone.
 
@@ -70,16 +70,16 @@
 
 ### Validation for User Story 2
 
-- [x] T016 [P] [US2] Validate join-key and provenance requirements in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/spec.md]
-- [x] T017 [P] [US2] Validate interface-map and identifier definitions in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/data-model.md]
-- [x] T018 [P] [US2] Run the five-flow review exercise described in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/quickstart.md]
+- [x] T016 [P] [US2] Validate join-key and provenance requirements in [specs/002-formalize-cross-repo-contract/spec.md]
+- [x] T017 [P] [US2] Validate interface-map and identifier definitions in [specs/002-formalize-cross-repo-contract/data-model.md]
+- [x] T018 [P] [US2] Run the five-flow review exercise described in [specs/002-formalize-cross-repo-contract/quickstart.md]
 
 ### Implementation for User Story 2
 
-- [x] T019 [US2] Document immutable canonical-ID join rules and natural-identifier limitations in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/contracts/cross-repo-boundary.md]
-- [x] T020 [US2] Document provenance and confidence guarantees for derived and reviewed records in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/contracts/cross-repo-boundary.md]
-- [x] T021 [US2] Add interface-map guidance, downstream reference guidance, and five-flow validation notes in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/quickstart.md]
-- [x] T022 [US2] Record the contract rationale for immutable cross-repo join keys in [/Users/chris/src/archive-graph-spacy/docs/adr/002-cross-repo-contract.md]
+- [x] T019 [US2] Document immutable canonical-ID join rules and natural-identifier limitations in [specs/002-formalize-cross-repo-contract/contracts/cross-repo-boundary.md]
+- [x] T020 [US2] Document provenance and confidence guarantees for derived and reviewed records in [specs/002-formalize-cross-repo-contract/contracts/cross-repo-boundary.md]
+- [x] T021 [US2] Add interface-map guidance, downstream reference guidance, and five-flow validation notes in [specs/002-formalize-cross-repo-contract/quickstart.md]
+- [x] T022 [US2] Record the contract rationale for immutable cross-repo join keys in [docs/adr/002-cross-repo-contract.md]
 
 **Checkpoint**: User Story 2 is complete when downstream work can consume one stable interface definition without redefining join or provenance semantics.
 
@@ -93,15 +93,15 @@
 
 ### Validation for User Story 3
 
-- [x] T023 [P] [US3] Validate review-state and promotion acceptance coverage in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/spec.md]
-- [x] T024 [P] [US3] Validate reviewed-assertion lifecycle and promotion-rule modeling in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/data-model.md]
-- [x] T025 [P] [US3] Run the five-assertion classification exercise described in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/quickstart.md]
+- [x] T023 [P] [US3] Validate review-state and promotion acceptance coverage in [specs/002-formalize-cross-repo-contract/spec.md]
+- [x] T024 [P] [US3] Validate reviewed-assertion lifecycle and promotion-rule modeling in [specs/002-formalize-cross-repo-contract/data-model.md]
+- [x] T025 [P] [US3] Run the five-assertion classification exercise described in [specs/002-formalize-cross-repo-contract/quickstart.md]
 
 ### Implementation for User Story 3
 
-- [x] T026 [US3] Document review-state, promotion-eligibility, accepted-but-not-promoted handling, and deferred questions in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/contracts/cross-repo-boundary.md]
-- [x] T027 [US3] Document promotion-rule rationale, rejected alternatives, and deferred questions in [/Users/chris/src/archive-graph-spacy/docs/adr/002-cross-repo-contract.md]
-- [x] T028 [US3] Add downstream adoption checks and five-assertion validation notes in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/quickstart.md]
+- [x] T026 [US3] Document review-state, promotion-eligibility, accepted-but-not-promoted handling, and deferred questions in [specs/002-formalize-cross-repo-contract/contracts/cross-repo-boundary.md]
+- [x] T027 [US3] Document promotion-rule rationale, rejected alternatives, and deferred questions in [docs/adr/002-cross-repo-contract.md]
+- [x] T028 [US3] Add downstream adoption checks and five-assertion validation notes in [specs/002-formalize-cross-repo-contract/quickstart.md]
 
 **Checkpoint**: User Story 3 is complete when review and promotion boundaries are explicit enough to unblock candidate-generation and curation workflow planning.
 
@@ -111,12 +111,12 @@
 
 **Purpose**: Final consistency, validation, and release-readiness across all stories.
 
-- [x] T029 [P] Refresh the implementation summary and constitution check in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/plan.md]
-- [x] T030 [P] Re-run and update the requirements checklist in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/checklists/requirements.md]
-- [x] T031 [P] Re-validate the quickstart adoption steps in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/quickstart.md]
-- [x] T032 [P] Add the exact local test command and release-gate command sequence to [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/quickstart.md]
-- [x] T033 Run `uv run pytest` and capture any contract-related follow-up in [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/tasks.md]
-- [x] T034 Run `.specify/scripts/bash/check-prerequisites.sh --json` and reconcile any path or numbering issues against [/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/tasks.md]
+- [x] T029 [P] Refresh the implementation summary and constitution check in [specs/002-formalize-cross-repo-contract/plan.md]
+- [x] T030 [P] Re-run and update the requirements checklist in [specs/002-formalize-cross-repo-contract/checklists/requirements.md]
+- [x] T031 [P] Re-validate the quickstart adoption steps in [specs/002-formalize-cross-repo-contract/quickstart.md]
+- [x] T032 [P] Add the exact local test command and release-gate command sequence to [specs/002-formalize-cross-repo-contract/quickstart.md]
+- [x] T033 Run `uv run pytest` and capture any contract-related follow-up in [specs/002-formalize-cross-repo-contract/tasks.md]
+- [x] T034 Run `.specify/scripts/bash/check-prerequisites.sh --json` and reconcile any path or numbering issues against [specs/002-formalize-cross-repo-contract/tasks.md]
 
 ---
 

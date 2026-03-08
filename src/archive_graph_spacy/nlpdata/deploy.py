@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from .databricks import DatabricksSqlClient, get_workspace_client
+from .databricks import DatabricksSqlClient, get_workspace_client, quote_sql_identifier
 
 DEFAULT_WAREHOUSE_ID = "4b799682f2bfd311"
 DEFAULT_CATALOG = "personal_archive_dev"
@@ -195,12 +195,19 @@ def cleanup_staged_directory(remote_dir: str, profile: str | None = None) -> Non
 
 
 def _schema_sql(catalog: str, schema: str) -> str:
-    return f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}"
+    return f"CREATE SCHEMA IF NOT EXISTS {quote_sql_identifier(catalog)}.{quote_sql_identifier(schema)}"
 
 
 def _deactivate_current_rows_sql(catalog: str, schema: str, table_name: str, remote_path: str) -> str:
+    qualified_table = ".".join(
+        (
+            quote_sql_identifier(catalog),
+            quote_sql_identifier(schema),
+            quote_sql_identifier(table_name),
+        )
+    )
     return f"""
-UPDATE {catalog}.{schema}.{table_name}
+UPDATE {qualified_table}
 SET is_current = false
 WHERE is_current = true
   AND message_id IN (
@@ -223,16 +230,18 @@ def deploy_staged_payload(
     workspace_client = get_workspace_client(profile)
     client = DatabricksSqlClient(workspace_client, warehouse_id=warehouse_id)
     remote_dir = stage_payload_directory(local_dir, run_id, profile=profile)
+    quoted_catalog = quote_sql_identifier(catalog)
+    quoted_schema = quote_sql_identifier(schema)
     client.execute(_schema_sql(catalog, schema))
     for table_name, ddl in TABLE_DDLS.items():
-        client.execute(ddl.format(catalog=catalog, schema=schema))
+        client.execute(ddl.format(catalog=quoted_catalog, schema=quoted_schema))
         remote_path = f"{remote_dir}/{table_name}.jsonl"
         if table_name in CURRENT_STATE_TABLES:
             client.execute(_deactivate_current_rows_sql(catalog, schema, table_name, remote_path))
         client.execute(
             INSERT_SELECTS[table_name].format(
-                catalog=catalog,
-                schema=schema,
+                catalog=quoted_catalog,
+                schema=quoted_schema,
                 remote_path=remote_path,
             )
         )

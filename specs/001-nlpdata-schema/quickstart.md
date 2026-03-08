@@ -25,9 +25,9 @@ read-only upstream source rather than writing new pipeline code there.
 
 Before implementation, confirm the planned v1 contract artifacts:
 
-- [data-model.md](/Users/chris/src/archive-graph-spacy/specs/001-nlpdata-schema/data-model.md)
-- [nlpdata-tables.md](/Users/chris/src/archive-graph-spacy/specs/001-nlpdata-schema/contracts/nlpdata-tables.md)
-- [research.md](/Users/chris/src/archive-graph-spacy/specs/001-nlpdata-schema/research.md)
+- [data-model.md](data-model.md)
+- [nlpdata-tables.md](contracts/nlpdata-tables.md)
+- [research.md](research.md)
 
 ## 4. Implement And Deploy To `personal_archive_dev.nlpdata`
 

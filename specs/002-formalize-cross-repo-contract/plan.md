@@ -1,7 +1,7 @@
 # Implementation Plan: Cross-Repo Contract
 
-**Branch**: `002-formalize-cross-repo-contract` | **Date**: 2026-03-08 | **Spec**: [spec.md](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/spec.md)
-**Input**: Feature specification from `/specs/002-formalize-cross-repo-contract/spec.md`
+**Branch**: `002-formalize-cross-repo-contract` | **Date**: 2026-03-08 | **Spec**: [spec.md](spec.md)
+**Input**: Feature specification from `specs/002-formalize-cross-repo-contract/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/plan-template.md` for the execution workflow.
 

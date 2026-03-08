@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -19,9 +20,18 @@ class DatabricksSqlError(RuntimeError):
     """Raised when Databricks SQL statement execution fails."""
 
 
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def quote_sql_identifier(value: str) -> str:
+    if not _IDENTIFIER_RE.fullmatch(value):
+        raise ValueError(f"Invalid SQL identifier: {value!r}")
+    return f"`{value}`"
+
+
 def get_workspace_client(profile: str | None = None) -> "WorkspaceClient":
     if WorkspaceClient is None:
-        raise ImportError("databricks-sdk is required. Run `uv sync --dev` after updating dependencies.")
+        raise ImportError("databricks-sdk is required. Run `uv sync` after updating dependencies.")
     if profile is None:
         profile = os.environ.get("DATABRICKS_PROFILE")
     if profile:

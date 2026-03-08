@@ -13,7 +13,7 @@ from archive_graph_spacy.nlpdata.pipeline import (
     validate_payload_contracts,
     write_pipeline_payload,
 )
-from archive_graph_spacy.nlpdata.source_loader import load_source_bundle, load_source_bundle_from_databricks
+from archive_graph_spacy.nlpdata.source_loader import load_source_bundle_from_databricks
 
 
 def build_nlpdata_from_bundle(export_dir: Path) -> dict[str, object]:

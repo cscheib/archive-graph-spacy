@@ -25,9 +25,9 @@ entities, ingestion, and the durable graph. This repo is for testing:
 The shared boundary between `archive-graph-data` and `archive-graph-spacy` is
 published here:
 
-- [Cross-Repo Contract Spec](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/spec.md)
-- [Cross-Repo Boundary Contract](/Users/chris/src/archive-graph-spacy/specs/002-formalize-cross-repo-contract/contracts/cross-repo-boundary.md)
-- [ADR 002: Cross-Repo Contract](/Users/chris/src/archive-graph-spacy/docs/adr/002-cross-repo-contract.md)
+- [Cross-Repo Contract Spec](specs/002-formalize-cross-repo-contract/spec.md)
+- [Cross-Repo Boundary Contract](specs/002-formalize-cross-repo-contract/contracts/cross-repo-boundary.md)
+- [ADR 002: Cross-Repo Contract](docs/adr/002-cross-repo-contract.md)
 
 Use those documents as the source of truth for ownership, join semantics,
 provenance, reviewed assertions, and promotion boundaries instead of repeating
@@ -97,7 +97,7 @@ Example export command from `graph-data`:
 
 ```bash
 uv run python scripts/export_spacy_snapshot.py \
-  /Users/chris/src/archive-graph-spacy/data_exports/graph-data-sample \
+  data_exports/graph-data-sample \
   --people-limit 250 \
   --message-limit 1000
 ```
