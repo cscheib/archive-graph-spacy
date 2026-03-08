@@ -10,7 +10,7 @@ resources:
         - task_key: backfill_01_1974_2012
           max_retries: 0
           disable_auto_optimization: true
-          timeout_seconds: 3600
+          timeout_seconds: 7200
           notebook_task:
             notebook_path: ../notebooks/01_nlpdata_refresh.py
             base_parameters:
@@ -27,7 +27,7 @@ resources:
             - task_key: backfill_01_1974_2012
           max_retries: 0
           disable_auto_optimization: true
-          timeout_seconds: 3600
+          timeout_seconds: 7200
           notebook_task:
             notebook_path: ../notebooks/01_nlpdata_refresh.py
             base_parameters:
@@ -44,7 +44,7 @@ resources:
             - task_key: backfill_02_2013_h1_2017
           max_retries: 0
           disable_auto_optimization: true
-          timeout_seconds: 3600
+          timeout_seconds: 7200
           notebook_task:
             notebook_path: ../notebooks/01_nlpdata_refresh.py
             base_parameters:
@@ -61,7 +61,7 @@ resources:
             - task_key: backfill_03_2017_h2_2018_h1
           max_retries: 0
           disable_auto_optimization: true
-          timeout_seconds: 3600
+          timeout_seconds: 7200
           notebook_task:
             notebook_path: ../notebooks/01_nlpdata_refresh.py
             base_parameters:
@@ -78,7 +78,7 @@ resources:
             - task_key: backfill_04_2018_h2_2019_h1
           max_retries: 0
           disable_auto_optimization: true
-          timeout_seconds: 3600
+          timeout_seconds: 7200
           notebook_task:
             notebook_path: ../notebooks/01_nlpdata_refresh.py
             base_parameters:
@@ -95,7 +95,7 @@ resources:
             - task_key: backfill_05_2019_h2_2020_h1
           max_retries: 0
           disable_auto_optimization: true
-          timeout_seconds: 3600
+          timeout_seconds: 7200
           notebook_task:
             notebook_path: ../notebooks/01_nlpdata_refresh.py
             base_parameters:
@@ -112,7 +112,7 @@ resources:
             - task_key: backfill_06_2020_h2_2021_h1
           max_retries: 0
           disable_auto_optimization: true
-          timeout_seconds: 3600
+          timeout_seconds: 7200
           notebook_task:
             notebook_path: ../notebooks/01_nlpdata_refresh.py
             base_parameters:
@@ -129,7 +129,7 @@ resources:
             - task_key: backfill_07_2021_h2_2022_h1
           max_retries: 0
           disable_auto_optimization: true
-          timeout_seconds: 3600
+          timeout_seconds: 7200
           notebook_task:
             notebook_path: ../notebooks/01_nlpdata_refresh.py
             base_parameters:
@@ -146,7 +146,7 @@ resources:
             - task_key: backfill_08_2022_h2_2023_h1
           max_retries: 0
           disable_auto_optimization: true
-          timeout_seconds: 3600
+          timeout_seconds: 7200
           notebook_task:
             notebook_path: ../notebooks/01_nlpdata_refresh.py
             base_parameters:
@@ -163,7 +163,7 @@ resources:
             - task_key: backfill_09_2023_h2_2024_h1
           max_retries: 0
           disable_auto_optimization: true
-          timeout_seconds: 3600
+          timeout_seconds: 7200
           notebook_task:
             notebook_path: ../notebooks/01_nlpdata_refresh.py
             base_parameters:
@@ -180,7 +180,7 @@ resources:
             - task_key: backfill_10_2024_h2_2025_h1
           max_retries: 0
           disable_auto_optimization: true
-          timeout_seconds: 3600
+          timeout_seconds: 7200
           notebook_task:
             notebook_path: ../notebooks/01_nlpdata_refresh.py
             base_parameters:
