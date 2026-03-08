@@ -114,8 +114,6 @@ story and deployment candidate must identify the tests that prove the behavior.
 
 ### Implementation for User Story 3
 
-- [X] T031 [P] [US3] Add publish-diagnostics record tests in `tests/test_nlpdata_deploy.py`
-- [X] T032 [P] [US3] Add CLI diagnostics exposure tests in `tests/test_scripts_build_nlpdata.py`
 - [X] T033 [P] [US3] Implement publish-stage and recovery diagnostics in `src/archive_graph_spacy/nlpdata/deploy.py`
 - [X] T034 [P] [US3] Extend run metadata serialization for publish diagnostics in `src/archive_graph_spacy/nlpdata/runs.py`
 - [X] T035 [US3] Expose publish diagnostics through `src/archive_graph_spacy/scripts/build_nlpdata.py`

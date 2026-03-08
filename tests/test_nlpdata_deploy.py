@@ -207,6 +207,31 @@ def test_deploy_staged_payload_marks_partial_failure_as_rerunnable(monkeypatch, 
     assert "message_theme_tags" in diagnostics["failed_tables"]
 
 
+def test_deploy_staged_payload_returns_diagnostics_when_persist_update_fails(monkeypatch, tmp_path: Path) -> None:
+    _write_payload_fixture(tmp_path)
+
+    sql_client = FakeSqlClient(
+        fail_on_statement="UPDATE `personal_archive_dev`.`nlpdata`.`nlp_runs`\nSET publish_diagnostics ="
+    )
+
+    monkeypatch.setattr("archive_graph_spacy.nlpdata.deploy.get_workspace_client", lambda profile=None: object())
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.DatabricksSqlClient",
+        lambda workspace_client, warehouse_id: sql_client,
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.stage_payload_directory",
+        lambda local_dir, run_id, profile=None: "dbfs:/tmp/archive_graph_spacy/nlpdata/run-123",
+    )
+    monkeypatch.setattr("archive_graph_spacy.nlpdata.deploy.cleanup_staged_directory", lambda remote_dir, profile=None: None)
+
+    result = deploy_staged_payload(tmp_path, run_id="run-123")
+
+    diagnostics = result["publish_diagnostics"]
+    assert diagnostics["publish_outcome"] == "finalized"
+    assert "diagnostics_persist_error" in diagnostics
+
+
 def test_deploy_staged_payload_rejects_overlapping_active_scope(monkeypatch, tmp_path: Path) -> None:
     _write_payload_fixture(tmp_path)
 
@@ -232,6 +257,24 @@ def test_deploy_staged_payload_rejects_overlapping_active_scope(monkeypatch, tmp
     assert diagnostics["recovery_action"] == "serialize_overlapping_scope"
     assert diagnostics["manual_intervention_required"] is True
     assert diagnostics["overlap_policy"] == "overlapping_scope"
+
+
+def test_staged_insert_sql_raises_if_current_state_pattern_is_missing(monkeypatch) -> None:
+    monkeypatch.setitem(
+        __import__("archive_graph_spacy.nlpdata.deploy", fromlist=["INSERT_SELECTS"]).INSERT_SELECTS,
+        "message_person_links",
+        "INSERT INTO {catalog}.{schema}.message_person_links SELECT 1",
+    )
+
+    from archive_graph_spacy.nlpdata.deploy import _staged_insert_sql
+
+    with pytest.raises(RuntimeError, match="Expected to replace 'CAST\\(is_current AS BOOLEAN\\)'"):
+        _staged_insert_sql(
+            "message_person_links",
+            catalog="`personal_archive_dev`",
+            schema="`nlpdata`",
+            remote_path="dbfs:/tmp/archive_graph_spacy/nlpdata/run-123/message_person_links.jsonl",
+        )
 
 
 def test_deploy_staged_payload_rejects_invalid_catalog_identifier(monkeypatch, tmp_path: Path) -> None:

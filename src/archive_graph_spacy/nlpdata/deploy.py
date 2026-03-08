@@ -271,7 +271,31 @@ def _staged_insert_sql(table_name: str, *, catalog: str, schema: str, remote_pat
     )
     if table_name not in CURRENT_STATE_TABLES:
         return statement
-    return statement.replace("CAST(is_current AS BOOLEAN)", "false")
+    replaced = statement.replace("CAST(is_current AS BOOLEAN)", "false")
+    if replaced == statement:
+        raise RuntimeError(
+            "Expected to replace 'CAST(is_current AS BOOLEAN)' when staging inserts "
+            f"for current-state table '{table_name}', but the pattern was not found. "
+            "The INSERT_SELECTS template may have changed."
+        )
+    return replaced
+
+
+def _try_persist_publish_diagnostics(
+    client: DatabricksSqlClient,
+    *,
+    catalog: str,
+    schema: str,
+    run_id: str,
+    diagnostics: dict[str, object],
+) -> dict[str, object]:
+    try:
+        client.execute(_update_run_diagnostics_sql(catalog, schema, run_id, diagnostics))
+        return diagnostics
+    except Exception as exc:
+        enriched = dict(diagnostics)
+        enriched["diagnostics_persist_error"] = str(exc)
+        return enriched
 
 
 def _load_jsonl_rows(path: Path) -> list[dict[str, object]]:
@@ -404,7 +428,13 @@ def deploy_staged_payload(
             failed_tables=tuple(failed_tables),
             manual_intervention_required=manual_intervention_required,
         ).to_record()
-        client.execute(_update_run_diagnostics_sql(catalog, schema, run_id, diagnostics))
+        diagnostics = _try_persist_publish_diagnostics(
+            client,
+            catalog=catalog,
+            schema=schema,
+            run_id=run_id,
+            diagnostics=diagnostics,
+        )
         if cleanup_remote:
             cleanup_staged_directory(remote_dir, profile=profile)
         return {
@@ -424,7 +454,13 @@ def deploy_staged_payload(
         failed_tables=tuple(failed_tables),
         manual_intervention_required=manual_intervention_required,
     ).to_record()
-    client.execute(_update_run_diagnostics_sql(catalog, schema, run_id, diagnostics))
+    diagnostics = _try_persist_publish_diagnostics(
+        client,
+        catalog=catalog,
+        schema=schema,
+        run_id=run_id,
+        diagnostics=diagnostics,
+    )
     if cleanup_remote:
         cleanup_staged_directory(remote_dir, profile=profile)
     return {
