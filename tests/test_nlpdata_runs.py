@@ -1,5 +1,6 @@
 import json
 
+from archive_graph_spacy.nlpdata.runs import classify_scope_overlap
 from archive_graph_spacy.scripts.build_nlpdata import build_nlpdata
 
 
@@ -25,3 +26,9 @@ def test_build_nlpdata_is_safe_to_rerun(tmp_path) -> None:
     assert second["status"] == "completed"
     assert len(rows) == 1
     assert rows[0]["message_id"] == "m-001"
+
+
+def test_classify_scope_overlap_distinguishes_same_overlap_and_independent() -> None:
+    assert classify_scope_overlap(("m-001",), (("m-001",),)) == "same_scope_rerun"
+    assert classify_scope_overlap(("m-001", "m-002"), (("m-002", "m-003"),)) == "overlapping_scope"
+    assert classify_scope_overlap(("m-001",), (("m-010",),)) == "non_overlapping_scope"

@@ -25,6 +25,7 @@ class RefreshRun:
     input_interaction_count: int
     output_row_counts: dict[str, int]
     quality_metrics: dict[str, int | float | bool]
+    publish_diagnostics: dict[str, object] = field(default_factory=dict)
 
     def to_record(self) -> dict[str, object]:
         payload = asdict(self)
@@ -164,3 +165,38 @@ class PipelineResult:
     theme_tags: tuple[ThemeTag, ...]
     search_docs: tuple[SearchDocument, ...]
     suppressed_counts: dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class BoundedPublishScope:
+    run_id: str
+    run_scope: str
+    affected_message_ids: tuple[str, ...]
+    affected_tables: tuple[str, ...]
+    overlap_class: str
+
+    def to_record(self) -> dict[str, object]:
+        payload = asdict(self)
+        payload["affected_message_ids"] = list(self.affected_message_ids)
+        payload["affected_tables"] = list(self.affected_tables)
+        return payload
+
+
+@dataclass(frozen=True)
+class PublishDiagnosticsRecord:
+    run_id: str
+    publish_scope: dict[str, object]
+    publish_stage: str
+    publish_outcome: str
+    overlap_policy: str
+    recovery_action: str
+    staged_path: str
+    finalized_tables: tuple[str, ...]
+    failed_tables: tuple[str, ...]
+    manual_intervention_required: bool
+
+    def to_record(self) -> dict[str, object]:
+        payload = asdict(self)
+        payload["finalized_tables"] = list(self.finalized_tables)
+        payload["failed_tables"] = list(self.failed_tables)
+        return payload

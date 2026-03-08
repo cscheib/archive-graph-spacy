@@ -13,6 +13,7 @@ TABLE_CONTRACTS: dict[str, tuple[str, ...]] = {
         "input_interaction_count",
         "output_row_counts",
         "quality_metrics",
+        "publish_diagnostics",
     ),
     "message_mentions": (
         "mention_id",

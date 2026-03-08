@@ -27,6 +27,10 @@ That project now owns the active planning backlog across:
 - the first implemented candidate-generation surface is published in
   [specs/004-candidate-assertions/spec.md](../specs/004-candidate-assertions/spec.md)
   and [specs/004-candidate-assertions/contracts/candidate-assertions-surface.md](../specs/004-candidate-assertions/contracts/candidate-assertions-surface.md)
+- the hardened bounded publish model is published in
+  [specs/005-nlpdata-publish-hardening/spec.md](../specs/005-nlpdata-publish-hardening/spec.md),
+  [specs/005-nlpdata-publish-hardening/contracts/bounded-publish-semantics.md](../specs/005-nlpdata-publish-hardening/contracts/bounded-publish-semantics.md),
+  and [docs/adr/004-nlpdata-publish-semantics.md](adr/004-nlpdata-publish-semantics.md)
 - this file is retained only as a pointer for future readers
 
 ## Current Planning Focus
@@ -35,5 +39,5 @@ The current early-stage execution focus is:
 
 1. cross-repo contract and reviewed-assertions model
 2. candidate-generation consumption and review UI in `archive-graph-data`
-3. safer `nlpdata` publish semantics
-4. follow-on relationship and diagnostics surfaces
+3. follow-on relationship and diagnostics surfaces
+4. downstream review consumption and operational polish
