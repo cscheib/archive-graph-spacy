@@ -1,5 +1,13 @@
 # Local Codex state
-.codex/
+.codex/*
+!.codex/prompts/
+!.codex/prompts/*.md
+!.codex/skills/
+.codex/skills/*
+!.codex/skills/gh-address-pr-comments/
+!.codex/skills/gh-address-pr-comments/SKILL.md
+!.codex/skills/gh-address-pr-comments/agents/
+!.codex/skills/gh-address-pr-comments/agents/openai.yaml
 
 # OS files
 .DS_Store
