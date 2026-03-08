@@ -1,27 +1,5 @@
 resources:
   jobs:
-    nlpdata_refresh:
-      name: "${bundle.target}_nlpdata_refresh"
-      description: "Build and refresh derived nlpdata tables from gold archive tables"
-      email_notifications:
-        on_failure:
-          - ${var.notification_email}
-      tasks:
-        - task_key: refresh_nlpdata
-          max_retries: 0
-          disable_auto_optimization: true
-          timeout_seconds: 3600
-          notebook_task:
-            notebook_path: ../notebooks/01_nlpdata_refresh.py
-            base_parameters:
-              catalog: "${var.catalog}"
-              schema: "nlpdata"
-              wheel_path: "${var.wheel_path}"
-              warehouse_id: "${var.warehouse_id}"
-              message_limit: ""
-              people_limit: ""
-              start_date: ""
-              end_date: ""
     nlpdata_backfill:
       name: "${bundle.target}_nlpdata_backfill"
       description: "Run the nlpdata refresh across the agreed historical backfill windows"
