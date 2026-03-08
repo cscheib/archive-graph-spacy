@@ -39,6 +39,7 @@ from archive_graph_spacy.nlpdata.databricks import (
 )
 from archive_graph_spacy.nlpdata.deploy import CURRENT_STATE_TABLES, TABLE_DDLS
 from archive_graph_spacy.nlpdata.pipeline import run_pipeline
+from archive_graph_spacy.nlpdata.spark_views import create_temp_view_from_rows
 from archive_graph_spacy.nlpdata.source_loader import source_bundle_from_rows
 
 catalog = dbutils.widgets.get("catalog") or "personal_archive_dev"
@@ -147,7 +148,12 @@ for table_name, ddl in TABLE_DDLS.items():
     if not rows:
         continue
     temp_view = f"tmp_{table_name}"
-    spark.createDataFrame(rows).createOrReplaceTempView(temp_view)
+    create_temp_view_from_rows(
+        spark,
+        table_name=table_name,
+        rows=rows,
+        temp_view=temp_view,
+    )
     if table_name in CURRENT_STATE_TABLES:
         spark.sql(
             f"""
