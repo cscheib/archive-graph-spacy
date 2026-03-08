@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from archive_graph_spacy.models import Contact, Message
 from archive_graph_spacy.nlpdata.pipeline import build_pipeline_payload, run_pipeline
+from archive_graph_spacy.nlpdata.person_links import derive_candidate_assertions
 from archive_graph_spacy.nlpdata.source_loader import load_source_bundle
 
 
@@ -61,3 +63,33 @@ def test_candidate_payload_publishes_jsonl_and_summary_contract_surfaces() -> No
         "suppressed_disambiguation_low_value": 3,
     }
     assert len(payload["candidate_assertions_summary"]["example_candidate_ids"]) == 5
+
+
+def test_repeated_ambiguous_mentions_emit_distinct_candidates() -> None:
+    contacts = (
+        Contact(person_id="p-alex-a", display_name="Alex Alpha", emails=("alex.alpha@example.com",), entity_type="person"),
+        Contact(person_id="p-alex-b", display_name="Alex Beta", emails=("alex.beta@example.com",), entity_type="person"),
+    )
+    messages = (
+        Message(
+            message_id="m-repeat",
+            source="chat",
+            sender="coordinator@example.com",
+            recipients=(),
+            subject="",
+            body="Alex said Alex will send the notes.",
+        ),
+    )
+
+    candidates, summary = derive_candidate_assertions(
+        messages,
+        contacts,
+        run_id="run-1",
+        generation_scope="repeat-scope",
+    )
+
+    assert len(candidates) == 2
+    assert candidates[0].candidate_assertion_id != candidates[1].candidate_assertion_id
+    assert candidates[0].proposed_claim != candidates[1].proposed_claim
+    assert all(any(ref.startswith("mention:") for ref in candidate.evidence_refs) for candidate in candidates)
+    assert summary.emitted_candidate_count == 2

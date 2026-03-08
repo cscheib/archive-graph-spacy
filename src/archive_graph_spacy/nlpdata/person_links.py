@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 from collections import defaultdict
 from datetime import timezone, datetime
+from dataclasses import dataclass
 from typing import Sequence
 
 from archive_graph_spacy.link.person import link_mentions_to_people
@@ -16,6 +17,14 @@ from .source_loader import contact_email_index, effective_person_contacts
 
 MIN_PERSON_LINK_CONFIDENCE = 0.5
 MIN_RELAY_CANDIDATE_CONFIDENCE = 0.75
+
+
+@dataclass(frozen=True)
+class DerivedLinkContext:
+    message: Message
+    extracted_mentions: tuple[InteractionMention, ...]
+    linked_candidates: dict[str, list[LinkCandidate]]
+    explicit_participants: frozenset[str]
 
 
 def _link_id(message_id: str, person_id: str, role: str, origin: str) -> str:
@@ -65,6 +74,52 @@ def _matches_leading_name_token(mention_text: str, person_name: str) -> bool:
     return bool(parts) and mention_text.casefold() == parts[0]
 
 
+def _explicit_participants(
+    message: Message,
+    email_lookup: dict[str, Contact],
+) -> set[str]:
+    explicit_participants: set[str] = set()
+    sender_contact = email_lookup.get(message.sender.casefold())
+    if sender_contact is not None and sender_contact.entity_type == "person":
+        explicit_participants.add(sender_contact.person_id)
+    for recipient in message.recipients:
+        recipient_contact = email_lookup.get(recipient.casefold())
+        if recipient_contact is not None and recipient_contact.entity_type == "person":
+            explicit_participants.add(recipient_contact.person_id)
+    return explicit_participants
+
+
+def derive_link_contexts(
+    messages: tuple[Message, ...],
+    contacts: tuple[Contact, ...],
+    run_id: str,
+) -> tuple[DerivedLinkContext, ...]:
+    email_lookup = contact_email_index(contacts)
+    person_contacts = effective_person_contacts(contacts)
+    contexts: list[DerivedLinkContext] = []
+    for message in messages:
+        explicit_participants = _explicit_participants(message, email_lookup)
+        extracted_mentions = extract_message_mentions(message, run_id)
+        mention_candidates = [
+            Mention(text=mention.span_text, label=mention.label, source=mention.source_type)
+            for mention in extracted_mentions
+        ]
+        linked_candidates = link_mentions_to_people(
+            mention_candidates,
+            list(person_contacts),
+            preferred_person_ids=explicit_participants,
+        )
+        contexts.append(
+            DerivedLinkContext(
+                message=message,
+                extracted_mentions=extracted_mentions,
+                linked_candidates=linked_candidates,
+                explicit_participants=frozenset(explicit_participants),
+            )
+        )
+    return tuple(contexts)
+
+
 def _relay_candidate(
     *,
     run_id: str,
@@ -102,7 +157,7 @@ def _disambiguation_candidate(
     candidates: Sequence[LinkCandidate],
 ) -> CandidateAssertion:
     plausible_ids = tuple(candidate.person_id for candidate in candidates)
-    proposed_claim = f"mention {mention.span_text!r} is ambiguous across {', '.join(plausible_ids)}"
+    proposed_claim = f"mention {mention.mention_id} {mention.span_text!r} is ambiguous across {', '.join(plausible_ids)}"
     evidence_refs = [f"message:{message.message_id}", f"mention:{mention.mention_id}"]
     evidence_refs.extend(
         f"candidate_reason:{candidate.person_id}:{'/'.join(candidate.reasons)}"
@@ -167,18 +222,16 @@ def derive_candidate_assertions(
 ) -> tuple[tuple[CandidateAssertion, ...], CandidateDiagnosticsSummary]:
     candidates_by_id: dict[str, CandidateAssertion] = {}
     suppressed = defaultdict(int)
+    contexts = derive_link_contexts(messages, contacts, run_id)
     email_lookup = contact_email_index(contacts)
     person_contacts = effective_person_contacts(contacts)
     person_lookup = {contact.person_id: contact for contact in person_contacts}
 
-    for message in messages:
+    for context in contexts:
+        message = context.message
         sender_contact = email_lookup.get(message.sender.casefold())
-        extracted_mentions = extract_message_mentions(message, run_id)
-        mention_candidates = [
-            Mention(text=mention.span_text, label=mention.label, source=mention.source_type)
-            for mention in extracted_mentions
-        ]
-        linked = link_mentions_to_people(mention_candidates, list(person_contacts))
+        extracted_mentions = context.extracted_mentions
+        linked = context.linked_candidates
 
         if _looks_like_relay_sender(message.sender) and (sender_contact is None or sender_contact.entity_type != "person"):
             supporting_links: list[PersonMessageLink] = []
@@ -256,9 +309,11 @@ def derive_person_links(
     email_lookup = contact_email_index(contacts)
     person_contacts = effective_person_contacts(contacts)
     person_lookup = {contact.person_id: contact for contact in person_contacts}
+    contexts = derive_link_contexts(messages, contacts, run_id)
 
-    for message in messages:
-        explicit_participants: set[str] = set()
+    for context in contexts:
+        message = context.message
+        explicit_participants = set(context.explicit_participants)
         sender_contact = email_lookup.get(message.sender.casefold())
         if sender_contact is None:
             suppressed["unresolved_sender"] += 1
@@ -305,17 +360,8 @@ def derive_person_links(
             )
             published_links[(link.message_id, link.person_id, link.role)] = link
 
-        extracted_mentions = extract_message_mentions(message, run_id)
-        mention_candidates = [
-            Mention(text=mention.span_text, label=mention.label, source=mention.source_type)
-            for mention in extracted_mentions
-        ]
-        linked = link_mentions_to_people(
-            mention_candidates,
-            list(person_contacts),
-            preferred_person_ids=explicit_participants,
-        )
-        for mention in extracted_mentions:
+        for mention in context.extracted_mentions:
+            linked = context.linked_candidates
             if mention.span_text not in linked:
                 published_mentions.append(mention)
                 continue

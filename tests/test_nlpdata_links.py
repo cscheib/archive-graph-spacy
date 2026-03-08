@@ -115,3 +115,30 @@ def test_derive_candidate_assertions_limits_disambiguation_to_multi_candidate_ca
     assert [candidate.assertion_type for candidate in candidates] == ["person_link_disambiguation"]
     assert "Alex" in candidates[0].proposed_claim
     assert summary.emitted_candidate_count == 1
+
+
+def test_derive_candidate_assertions_respects_explicit_participant_context() -> None:
+    contacts = (
+        Contact(person_id="p-alex-a", display_name="Alex Alpha", emails=("alex.alpha@example.com",), entity_type="person"),
+        Contact(person_id="p-alex-b", display_name="Alex Beta", emails=("alex.beta@example.com",), entity_type="person"),
+    )
+    messages = (
+        Message(
+            message_id="m-context",
+            source="email",
+            sender="coordinator@example.com",
+            recipients=("alex.alpha@example.com",),
+            subject="",
+            body="Alex confirmed the schedule.",
+        ),
+    )
+
+    candidates, summary = derive_candidate_assertions(
+        messages,
+        contacts,
+        run_id="run-1",
+        generation_scope="fixture-scope",
+    )
+
+    assert candidates == ()
+    assert summary.emitted_candidate_count == 0
