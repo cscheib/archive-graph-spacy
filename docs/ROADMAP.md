@@ -20,6 +20,10 @@ That project now owns the active planning backlog across:
 - the shared cross-repo contract is published in
   [specs/002-formalize-cross-repo-contract/spec.md](../specs/002-formalize-cross-repo-contract/spec.md)
   and [docs/adr/002-cross-repo-contract.md](adr/002-cross-repo-contract.md)
+- the reviewed-assertions lifecycle model is published in
+  [specs/003-reviewed-assertions-pipeline/spec.md](../specs/003-reviewed-assertions-pipeline/spec.md),
+  [specs/003-reviewed-assertions-pipeline/contracts/reviewed-assertions-lifecycle.md](../specs/003-reviewed-assertions-pipeline/contracts/reviewed-assertions-lifecycle.md),
+  and [docs/adr/003-reviewed-assertions-promotion-model.md](adr/003-reviewed-assertions-promotion-model.md)
 - this file is retained only as a pointer for future readers
 
 ## Current Planning Focus
