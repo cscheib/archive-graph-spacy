@@ -120,7 +120,7 @@ def main() -> int:
             end_date=args.end_date,
         )
     if args.deploy:
-        result["deployment"] = deploy_staged_payload(
+        deployment = deploy_staged_payload(
             Path(result["derived_dir"]),
             run_id=str(result["run_id"]),
             profile=args.profile,
@@ -129,6 +129,8 @@ def main() -> int:
             warehouse_id=args.warehouse_id,
             cleanup_remote=not args.keep_staged_files,
         )
+        result["deployment"] = deployment
+        result["publish_diagnostics"] = deployment["publish_diagnostics"]
     print(json.dumps(result, indent=2))
     return 0
 

@@ -70,6 +70,23 @@ data_exports/<bundle>/derived/nlpdata/
 └── candidate_assertions_summary.json
 ```
 
+## Publish Hardening
+
+`build_nlpdata --deploy` now uses bounded publish semantics for current-state
+tables:
+
+- current-state rows stage as non-current before finalization
+- finalization deactivates prior current rows and activates the staged rows for
+  the new run
+- deployment diagnostics report `staged`, `finalized`, `partial`, or `failed`
+  outcome plus recovery guidance
+
+The publish-hardening artifacts are published here:
+
+- [Publish Hardening Spec](specs/005-nlpdata-publish-hardening/spec.md)
+- [Bounded Publish Contract](specs/005-nlpdata-publish-hardening/contracts/bounded-publish-semantics.md)
+- [ADR 004: nlpdata Publish Semantics](docs/adr/004-nlpdata-publish-semantics.md)
+
 ## Quickstart
 
 ```bash
@@ -185,6 +202,14 @@ uv run python -m archive_graph_spacy.scripts.build_nlpdata \
 
 This uses the local Databricks CLI for auth and DBFS staging, then writes Delta
 tables through the SQL Statements API.
+
+The deploy command now returns a `deployment.publish_diagnostics` payload with:
+
+- bounded publish scope
+- publish stage reached
+- finalized and failed tables
+- recovery action
+- manual-intervention flag when rerun is not provably safe
 
 For managed Databricks assets and deployment, this repo now includes a
 Databricks Asset Bundle:

@@ -93,8 +93,11 @@ the change.
 - Markdown-first planning artifacts for a Python 3.12 repository + Existing repo docs/spec workflow, cross-repo boundary contract, pytest, `uv`, GitHub issues/projects (003-reviewed-assertions-pipeline)
 - Python 3.12 for local pipeline code and validation + Existing `archive_graph_spacy.nlpdata` pipeline modules, repo contracts/ADRs, pytest, `uv` (004-candidate-assertions)
 - Local JSONL-derived outputs under `data_exports/<bundle>/derived/nlpdata/` plus run-scoped diagnostics summaries in the same derived area (004-candidate-assertions)
+- Python 3.12 for local pipeline, deployment, and validation code + Existing `archive_graph_spacy.nlpdata` deploy/pipeline modules, Databricks SQL client helpers, pytest, `uv` (005-nlpdata-publish-hardening)
+- Local JSONL-derived outputs plus Databricks Delta tables in `personal_archive_dev.nlpdata` (005-nlpdata-publish-hardening)
 
 ## Recent Changes
 - 001-nlpdata-schema: Added the local `nlpdata` pipeline, builder CLI, run metadata, and message-level search workspace contracts
 - 003-reviewed-assertions-pipeline: Added the reviewed-assertions lifecycle plan, data model, contract, quickstart, and ADR for explicit human-reviewed promotion boundaries
 - 004-candidate-assertions: Added first-wave candidate assertion generation, persisted candidate outputs, diagnostics summary, and fixture-driven validation for relay sender and bounded disambiguation cases
+- 005-nlpdata-publish-hardening: Added bounded publish finalization, rerun recovery diagnostics, manual-intervention criteria, and deploy-path validation for `build_nlpdata --deploy`
