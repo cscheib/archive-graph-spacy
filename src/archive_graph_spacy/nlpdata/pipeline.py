@@ -111,9 +111,21 @@ def write_pipeline_payload(export_dir: str | Path, payload: dict[str, object]) -
 
 
 def validate_payload_contracts(payload: dict[str, object]) -> None:
-    for table_name, required_columns in TABLE_CONTRACTS.items():
-        rows = payload.get(table_name, [])
+    for artifact_name, required_columns in TABLE_CONTRACTS.items():
+        rows = payload.get(artifact_name, [])
+        if artifact_name == "candidate_assertions_summary":
+            if not isinstance(rows, dict):
+                raise ValueError(f"{artifact_name} payload must be a dict")
+            missing = [column for column in required_columns if column not in rows]
+            if missing:
+                raise ValueError(f"{artifact_name} payload missing columns: {missing}")
+            continue
+
+        if not isinstance(rows, list):
+            raise ValueError(f"{artifact_name} payload must be a list of row dicts")
         for row in rows:
+            if not isinstance(row, dict):
+                raise ValueError(f"{artifact_name} row must be a dict")
             missing = [column for column in required_columns if column not in row]
             if missing:
-                raise ValueError(f"{table_name} row missing columns: {missing}")
+                raise ValueError(f"{artifact_name} row missing columns: {missing}")

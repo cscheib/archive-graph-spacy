@@ -2,7 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-03-08
-**Feature**: [spec.md](/Users/chris/src/archive-graph-spacy/specs/004-candidate-assertions/spec.md)
+**Feature**: [spec.md](../spec.md)
 
 ## Content Quality
 

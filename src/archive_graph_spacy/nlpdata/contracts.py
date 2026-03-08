@@ -54,6 +54,15 @@ TABLE_CONTRACTS: dict[str, tuple[str, ...]] = {
         "review_class",
         "promotion_class",
     ),
+    "candidate_assertions_summary": (
+        "run_id",
+        "generation_scope",
+        "emitted_candidate_count",
+        "candidate_counts_by_type",
+        "suppressed_counts",
+        "example_candidate_ids",
+        "generated_at",
+    ),
     "message_theme_tags": (
         "theme_tag_id",
         "run_id",

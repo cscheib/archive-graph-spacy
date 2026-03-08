@@ -5,9 +5,10 @@ from __future__ import annotations
 import hashlib
 from collections import defaultdict
 from datetime import timezone, datetime
+from typing import Sequence
 
 from archive_graph_spacy.link.person import link_mentions_to_people
-from archive_graph_spacy.models import Contact, Mention, Message
+from archive_graph_spacy.models import Contact, LinkCandidate, Mention, Message
 
 from .mentions import extract_message_mentions
 from .models import CandidateAssertion, CandidateDiagnosticsSummary, InteractionMention, PersonMessageLink
@@ -98,7 +99,7 @@ def _disambiguation_candidate(
     generation_scope: str,
     message: Message,
     mention: InteractionMention,
-    candidates: list,
+    candidates: Sequence[LinkCandidate],
 ) -> CandidateAssertion:
     plausible_ids = tuple(candidate.person_id for candidate in candidates)
     proposed_claim = f"mention {mention.span_text!r} is ambiguous across {', '.join(plausible_ids)}"
@@ -125,7 +126,7 @@ def _disambiguation_candidate(
 
 def _is_reviewable_disambiguation(
     mention: InteractionMention,
-    candidates: list,
+    candidates: Sequence[LinkCandidate],
     person_lookup: dict[str, Contact],
 ) -> bool:
     if len(mention.span_text.split()) != 1:
