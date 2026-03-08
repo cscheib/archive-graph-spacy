@@ -1,0 +1,7 @@
+{"message_id":"m-relay-bob","source":"email","sender":"relay+bob@relay.example.com","recipients":[],"subject":"Intro","body":"Bob Example can help with the handoff."}
+{"message_id":"m-relay-alice","source":"email","sender":"relay+alice@relay.example.com","recipients":[],"subject":"Status","body":"Please follow up with Alice Example about the report."}
+{"message_id":"m-ambiguous-alex","source":"chat","sender":"coordinator@example.com","recipients":[],"subject":"","body":"Alex will join the call."}
+{"message_id":"m-ambiguous-jamie","source":"chat","sender":"coordinator@example.com","recipients":[],"subject":"","body":"Jamie approved the schedule."}
+{"message_id":"m-ambiguous-sam","source":"chat","sender":"coordinator@example.com","recipients":[],"subject":"","body":"Sam shared a draft yesterday."}
+{"message_id":"m-single-low-confidence","source":"chat","sender":"coordinator@example.com","recipients":[],"subject":"","body":"Morgan said hello."}
+{"message_id":"m-clear-winner","source":"chat","sender":"coordinator@example.com","recipients":[],"subject":"","body":"Alice Example closed the loop."}

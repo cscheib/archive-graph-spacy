@@ -24,6 +24,9 @@ That project now owns the active planning backlog across:
   [specs/003-reviewed-assertions-pipeline/spec.md](../specs/003-reviewed-assertions-pipeline/spec.md),
   [specs/003-reviewed-assertions-pipeline/contracts/reviewed-assertions-lifecycle.md](../specs/003-reviewed-assertions-pipeline/contracts/reviewed-assertions-lifecycle.md),
   and [docs/adr/003-reviewed-assertions-promotion-model.md](adr/003-reviewed-assertions-promotion-model.md)
+- the first implemented candidate-generation surface is published in
+  [specs/004-candidate-assertions/spec.md](../specs/004-candidate-assertions/spec.md)
+  and [specs/004-candidate-assertions/contracts/candidate-assertions-surface.md](../specs/004-candidate-assertions/contracts/candidate-assertions-surface.md)
 - this file is retained only as a pointer for future readers
 
 ## Current Planning Focus
@@ -31,6 +34,6 @@ That project now owns the active planning backlog across:
 The current early-stage execution focus is:
 
 1. cross-repo contract and reviewed-assertions model
-2. safer `nlpdata` publish semantics
-3. person-centric discovery UI in `archive-graph-data`
-4. follow-on relationship, diagnostics, and review surfaces
+2. candidate-generation consumption and review UI in `archive-graph-data`
+3. safer `nlpdata` publish semantics
+4. follow-on relationship and diagnostics surfaces

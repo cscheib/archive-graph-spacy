@@ -44,25 +44,27 @@ Given that feature description, do this:
       git fetch --all --prune
       ```
 
-   b. Find the highest feature number across all sources for the short-name:
-      - Remote branches: `git ls-remote --heads origin | grep -E 'refs/heads/[0-9]+-<short-name>$'`
-      - Local branches: `git branch | grep -E '^[* ]*[0-9]+-<short-name>$'`
-      - Specs directories: Check for directories matching `specs/[0-9]+-<short-name>`
+   b. Find the highest feature number across all sources for the repository:
+      - Remote branches: any branch matching `refs/heads/[0-9]+-*`
+      - Local branches: any branch matching `^[* ]*[0-9]+-*`
+      - Specs directories: any directory matching `specs/[0-9]+-*`
 
    c. Determine the next available number:
       - Extract all numbers from all three sources
       - Find the highest number N
       - Use N+1 for the new branch number
 
-   d. Run the script `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS"` with the calculated number and short-name:
-      - Pass `--number N+1` and `--short-name "your-short-name"` along with the feature description
-      - Bash example: `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS" --json --number 5 --short-name "user-auth" "Add user authentication"`
-      - PowerShell example: `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS" -Json -Number 5 -ShortName "user-auth" "Add user authentication"`
+   d. Run the script `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS"` with the short-name and feature description:
+      - Prefer letting the script auto-detect the next repo-global number
+      - Pass `--short-name "your-short-name"` along with the feature description
+      - Bash example: `.specify/scripts/bash/create-new-feature.sh --json --short-name "user-auth" "Add user authentication"`
+      - PowerShell example: `.specify/scripts/bash/create-new-feature.sh -Json -ShortName "user-auth" "Add user authentication"`
+      - Only pass `--number N+1` if you have already computed the next repo-global number across all branches and spec directories
 
    **IMPORTANT**:
+   - Feature numbers must be globally unique across the repository, regardless of short-name
    - Check all three sources (remote branches, local branches, specs directories) to find the highest number
-   - Only match branches/directories with the exact short-name pattern
-   - If no existing branches/directories found with this short-name, start with number 1
+   - Never restart numbering at `001` for a new short-name if higher feature prefixes already exist
    - You must only ever run this script once per feature
    - The JSON is provided in the terminal as output - always refer to it to get the actual content you're looking for
    - The JSON output will contain BRANCH_NAME and SPEC_FILE paths

@@ -40,6 +40,10 @@ Positive:
   contract
 - `archive-graph-spacy#2` can generate candidate assertions without inventing
   its own review-state model
+- `archive-graph-spacy#2` can publish one persisted candidate surface
+  (`candidate_assertions.jsonl`) plus one diagnostics summary
+  (`candidate_assertions_summary.json`) without conflating candidate outputs
+  with reviewed storage
 - downstream review and override workflows have one contract to reference for
   ownership, state transitions, and required fields
 - reviewed history remains durable without silently rewriting canonical truth
@@ -68,6 +72,10 @@ Negative:
 
 - Which future assertion types beyond the first wave should become
   `promotion_eligible`?
+- Should future relay sender candidate rules expand beyond explicitly
+  relay-like sender addresses?
+- Should future disambiguation candidate rules expand beyond leading-token,
+  multi-candidate ambiguity cases?
 - What concrete UI affordances should `archive-graph-data` require for
   reviewer rationale, conflict handling, and supersession history?
 - What validation workflow should downstream repos use to prove they still

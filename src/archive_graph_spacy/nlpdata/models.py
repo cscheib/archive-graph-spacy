@@ -70,6 +70,43 @@ class PersonMessageLink:
 
 
 @dataclass(frozen=True)
+class CandidateAssertion:
+    candidate_assertion_id: str
+    run_id: str
+    assertion_type: str
+    subject_canonical_id: str
+    proposed_claim: str
+    evidence_refs: tuple[str, ...]
+    provenance_summary: str
+    confidence_level: float
+    generation_scope: str
+    generated_at: str
+    review_class: str
+    promotion_class: str
+
+    def to_record(self) -> dict[str, object]:
+        payload = asdict(self)
+        payload["evidence_refs"] = list(self.evidence_refs)
+        return payload
+
+
+@dataclass(frozen=True)
+class CandidateDiagnosticsSummary:
+    run_id: str
+    generation_scope: str
+    emitted_candidate_count: int
+    candidate_counts_by_type: dict[str, int]
+    suppressed_counts: dict[str, int]
+    example_candidate_ids: tuple[str, ...]
+    generated_at: str
+
+    def to_record(self) -> dict[str, object]:
+        payload = asdict(self)
+        payload["example_candidate_ids"] = list(self.example_candidate_ids)
+        return payload
+
+
+@dataclass(frozen=True)
 class ThemeTag:
     theme_tag_id: str
     run_id: str
@@ -122,6 +159,8 @@ class PipelineResult:
     run: RefreshRun
     mentions: tuple[InteractionMention, ...]
     person_links: tuple[PersonMessageLink, ...]
+    candidate_assertions: tuple[CandidateAssertion, ...]
+    candidate_summary: CandidateDiagnosticsSummary
     theme_tags: tuple[ThemeTag, ...]
     search_docs: tuple[SearchDocument, ...]
     suppressed_counts: dict[str, int] = field(default_factory=dict)
