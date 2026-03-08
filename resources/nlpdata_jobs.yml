@@ -1,0 +1,216 @@
+resources:
+  jobs:
+    nlpdata_refresh:
+      name: "${bundle.target}_nlpdata_refresh"
+      description: "Build and refresh derived nlpdata tables from gold archive tables"
+      email_notifications:
+        on_failure:
+          - ${var.notification_email}
+      tasks:
+        - task_key: refresh_nlpdata
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 3600
+          notebook_task:
+            notebook_path: ../notebooks/01_nlpdata_refresh.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "nlpdata"
+              wheel_path: "${var.wheel_path}"
+              warehouse_id: "${var.warehouse_id}"
+              message_limit: ""
+              people_limit: ""
+              start_date: ""
+              end_date: ""
+    nlpdata_backfill:
+      name: "${bundle.target}_nlpdata_backfill"
+      description: "Run the nlpdata refresh across the agreed historical backfill windows"
+      email_notifications:
+        on_failure:
+          - ${var.notification_email}
+      tasks:
+        - task_key: backfill_01_1974_2012
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 3600
+          notebook_task:
+            notebook_path: ../notebooks/01_nlpdata_refresh.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "nlpdata"
+              wheel_path: "${var.wheel_path}"
+              warehouse_id: "${var.warehouse_id}"
+              message_limit: ""
+              people_limit: ""
+              start_date: "1974-01-01"
+              end_date: "2013-01-01"
+        - task_key: backfill_02_2013_h1_2017
+          depends_on:
+            - task_key: backfill_01_1974_2012
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 3600
+          notebook_task:
+            notebook_path: ../notebooks/01_nlpdata_refresh.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "nlpdata"
+              wheel_path: "${var.wheel_path}"
+              warehouse_id: "${var.warehouse_id}"
+              message_limit: ""
+              people_limit: ""
+              start_date: "2013-01-01"
+              end_date: "2017-07-01"
+        - task_key: backfill_03_2017_h2_2018_h1
+          depends_on:
+            - task_key: backfill_02_2013_h1_2017
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 3600
+          notebook_task:
+            notebook_path: ../notebooks/01_nlpdata_refresh.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "nlpdata"
+              wheel_path: "${var.wheel_path}"
+              warehouse_id: "${var.warehouse_id}"
+              message_limit: ""
+              people_limit: ""
+              start_date: "2017-07-01"
+              end_date: "2018-07-01"
+        - task_key: backfill_04_2018_h2_2019_h1
+          depends_on:
+            - task_key: backfill_03_2017_h2_2018_h1
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 3600
+          notebook_task:
+            notebook_path: ../notebooks/01_nlpdata_refresh.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "nlpdata"
+              wheel_path: "${var.wheel_path}"
+              warehouse_id: "${var.warehouse_id}"
+              message_limit: ""
+              people_limit: ""
+              start_date: "2018-07-01"
+              end_date: "2019-07-01"
+        - task_key: backfill_05_2019_h2_2020_h1
+          depends_on:
+            - task_key: backfill_04_2018_h2_2019_h1
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 3600
+          notebook_task:
+            notebook_path: ../notebooks/01_nlpdata_refresh.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "nlpdata"
+              wheel_path: "${var.wheel_path}"
+              warehouse_id: "${var.warehouse_id}"
+              message_limit: ""
+              people_limit: ""
+              start_date: "2019-07-01"
+              end_date: "2020-07-01"
+        - task_key: backfill_06_2020_h2_2021_h1
+          depends_on:
+            - task_key: backfill_05_2019_h2_2020_h1
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 3600
+          notebook_task:
+            notebook_path: ../notebooks/01_nlpdata_refresh.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "nlpdata"
+              wheel_path: "${var.wheel_path}"
+              warehouse_id: "${var.warehouse_id}"
+              message_limit: ""
+              people_limit: ""
+              start_date: "2020-07-01"
+              end_date: "2021-07-01"
+        - task_key: backfill_07_2021_h2_2022_h1
+          depends_on:
+            - task_key: backfill_06_2020_h2_2021_h1
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 3600
+          notebook_task:
+            notebook_path: ../notebooks/01_nlpdata_refresh.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "nlpdata"
+              wheel_path: "${var.wheel_path}"
+              warehouse_id: "${var.warehouse_id}"
+              message_limit: ""
+              people_limit: ""
+              start_date: "2021-07-01"
+              end_date: "2022-07-01"
+        - task_key: backfill_08_2022_h2_2023_h1
+          depends_on:
+            - task_key: backfill_07_2021_h2_2022_h1
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 3600
+          notebook_task:
+            notebook_path: ../notebooks/01_nlpdata_refresh.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "nlpdata"
+              wheel_path: "${var.wheel_path}"
+              warehouse_id: "${var.warehouse_id}"
+              message_limit: ""
+              people_limit: ""
+              start_date: "2022-07-01"
+              end_date: "2023-07-01"
+        - task_key: backfill_09_2023_h2_2024_h1
+          depends_on:
+            - task_key: backfill_08_2022_h2_2023_h1
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 3600
+          notebook_task:
+            notebook_path: ../notebooks/01_nlpdata_refresh.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "nlpdata"
+              wheel_path: "${var.wheel_path}"
+              warehouse_id: "${var.warehouse_id}"
+              message_limit: ""
+              people_limit: ""
+              start_date: "2023-07-01"
+              end_date: "2024-07-01"
+        - task_key: backfill_10_2024_h2_2025_h1
+          depends_on:
+            - task_key: backfill_09_2023_h2_2024_h1
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 3600
+          notebook_task:
+            notebook_path: ../notebooks/01_nlpdata_refresh.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "nlpdata"
+              wheel_path: "${var.wheel_path}"
+              warehouse_id: "${var.warehouse_id}"
+              message_limit: ""
+              people_limit: ""
+              start_date: "2024-07-01"
+              end_date: "2025-07-01"
+        - task_key: backfill_11_2025_h2_2026_h1
+          depends_on:
+            - task_key: backfill_10_2024_h2_2025_h1
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 3600
+          notebook_task:
+            notebook_path: ../notebooks/01_nlpdata_refresh.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "nlpdata"
+              wheel_path: "${var.wheel_path}"
+              warehouse_id: "${var.warehouse_id}"
+              message_limit: ""
+              people_limit: ""
+              start_date: "2025-07-01"
+              end_date: "2026-07-01"

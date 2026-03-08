@@ -1,0 +1,4 @@
+interface:
+  display_name: "Address PR Comments"
+  short_description: "Fix, reply to, and resolve GitHub PR reviews"
+  default_prompt: "Use $gh-address-pr-comments to address the outstanding review threads on this GitHub pull request and resolve them after verification."

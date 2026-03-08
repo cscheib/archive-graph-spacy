@@ -17,7 +17,21 @@ entities, ingestion, and the durable graph. This repo is for testing:
 - mention extraction from message text
 - candidate linking from mentions to canonical people
 - scoring and evaluation on exported snapshots
+- local derivation of `nlpdata`-style search tables before Databricks deployment
 - analysis of failure modes before changes flow back to the main project
+
+## Cross-Repo Contract
+
+The shared boundary between `archive-graph-data` and `archive-graph-spacy` is
+published here:
+
+- [Cross-Repo Contract Spec](specs/002-formalize-cross-repo-contract/spec.md)
+- [Cross-Repo Boundary Contract](specs/002-formalize-cross-repo-contract/contracts/cross-repo-boundary.md)
+- [ADR 002: Cross-Repo Contract](docs/adr/002-cross-repo-contract.md)
+
+Use those documents as the source of truth for ownership, join semantics,
+provenance, reviewed assertions, and promotion boundaries instead of repeating
+that logic in local notes or issue bodies.
 
 ## Quickstart
 
@@ -25,6 +39,7 @@ entities, ingestion, and the durable graph. This repo is for testing:
 uv python install 3.12
 uv sync --dev
 uv run pytest
+uv run python -m archive_graph_spacy.scripts.build_nlpdata data_samples
 uv run python -m archive_graph_spacy.scripts.run_sample data_samples/sample_messages.jsonl
 uv run python -m archive_graph_spacy.scripts.run_export data_exports/graph-data-sample
 uv run python -m archive_graph_spacy.scripts.build_edges data_exports/graph-data-sample
@@ -62,6 +77,7 @@ uv run python -m spacy download en_core_web_sm
 
 ```text
 src/archive_graph_spacy/io.py          # Export-loading helpers
+src/archive_graph_spacy/nlpdata/       # Derived search-workspace pipeline
 src/archive_graph_spacy/extract/       # Mention extraction logic
 src/archive_graph_spacy/link/          # Candidate entity linking
 src/archive_graph_spacy/evaluate/      # Metrics and scoring
@@ -81,7 +97,7 @@ Example export command from `graph-data`:
 
 ```bash
 uv run python scripts/export_spacy_snapshot.py \
-  /Users/chris/src/archive-graph-spacy/data_exports/graph-data-sample \
+  data_exports/graph-data-sample \
   --people-limit 250 \
   --message-limit 1000
 ```
@@ -99,6 +115,69 @@ To build queryable person-message edges from that bundle:
 ```bash
 uv run python -m archive_graph_spacy.scripts.build_edges data_exports/graph-data-sample
 ```
+
+To build local `nlpdata` tables from the same bundle:
+
+```bash
+uv run python -m archive_graph_spacy.scripts.build_nlpdata data_exports/graph-data-sample
+```
+
+This writes:
+
+```text
+data_exports/<bundle>/derived/nlpdata/
+├── nlp_runs.jsonl
+├── message_mentions.jsonl
+├── message_person_links.jsonl
+├── message_theme_tags.jsonl
+└── message_search_docs.jsonl
+```
+
+To stage and deploy those derived tables into Databricks:
+
+```bash
+uv run python -m archive_graph_spacy.scripts.build_nlpdata \
+  data_exports/graph-data-sample \
+  --deploy \
+  --profile cscheib-free-ws \
+  --catalog personal_archive_dev \
+  --schema nlpdata
+```
+
+This uses the local Databricks CLI for auth and DBFS staging, then writes Delta
+tables through the SQL Statements API.
+
+For managed Databricks assets and deployment, this repo now includes a
+Databricks Asset Bundle:
+
+```bash
+databricks bundle validate -t dev
+databricks bundle deploy -t dev
+databricks bundle run -t dev nlpdata_refresh
+```
+
+The bundle deploys the project wheel plus a notebook-driven refresh job that
+uses Spark SQL to read directly from `personal_archive_dev.gold` and
+`personal_archive_dev.memory`, then writes `personal_archive_dev.nlpdata`.
+
+For the agreed historical backfill windows, use the canned sequential job:
+
+```bash
+databricks bundle run -t dev nlpdata_backfill
+```
+
+That job runs these windows in order:
+- `1974-01-01` to `2013-01-01`
+- `2013-01-01` to `2017-07-01`
+- `2017-07-01` to `2018-07-01`
+- `2018-07-01` to `2019-07-01`
+- `2019-07-01` to `2020-07-01`
+- `2020-07-01` to `2021-07-01`
+- `2021-07-01` to `2022-07-01`
+- `2022-07-01` to `2023-07-01`
+- `2023-07-01` to `2024-07-01`
+- `2024-07-01` to `2025-07-01`
+- `2025-07-01` to `2026-07-01`
 
 The emitted rows distinguish explicit metadata edges (`sender`, `recipient`)
 from inferred mention edges (`mentioned`).

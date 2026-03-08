@@ -4,8 +4,8 @@
 
 This repository is an experimentation harness around `graph-data` exports.
 Application code lives in `src/archive_graph_spacy/` with subpackages for
-`extract/`, `link/`, `evaluate/`, and lightweight `scripts/`. Tests live in
-`tests/` and should mirror the module they cover, for example
+`nlpdata/`, `extract/`, `link/`, `evaluate/`, and lightweight `scripts/`.
+Tests live in `tests/` and should mirror the module they cover, for example
 `tests/test_link_person.py` for `src/archive_graph_spacy/link/person.py`.
 
 Project process templates and the governing constitution live under
@@ -20,6 +20,19 @@ not source material.
   deployment.
 - `uv run python -m archive_graph_spacy.scripts.run_sample data_samples/sample_messages.jsonl`:
   run the sample extraction/linking pipeline against a fixture export.
+- `uv run python -m archive_graph_spacy.scripts.build_nlpdata data_exports/<name>`:
+  derive local `nlpdata` tables with run metadata, mentions, person links,
+  theme tags, and search documents under `data_exports/<name>/derived/nlpdata/`.
+- `uv run python -m archive_graph_spacy.scripts.build_nlpdata data_exports/<name> --deploy --profile <profile>`:
+  stage the derived `nlpdata` bundle to DBFS and write
+  `personal_archive_dev.nlpdata` Delta tables through the Databricks SQL
+  Statements API.
+- `databricks bundle validate -t dev`:
+  validate the Databricks Asset Bundle in [databricks.yml](databricks.yml).
+- `databricks bundle deploy -t dev`:
+  deploy the project wheel and `nlpdata_refresh` job resources to Databricks.
+- `databricks bundle run -t dev nlpdata_refresh`:
+  execute the bundle-managed refresh job against Databricks source tables.
 - `uv run python -m archive_graph_spacy.scripts.run_export data_exports/<name>`:
   run the extraction/linking pipeline against a `graph-data` export bundle.
 - `uv run python -m archive_graph_spacy.scripts.build_edges data_exports/<name>`:
@@ -71,3 +84,12 @@ Recent history uses short, imperative commits with optional prefixes, such as
 Pull requests should include a brief description, the related spec or issue,
 the local test command(s) run, and any documentation or ADR updates required by
 the change.
+
+## Active Technologies
+- Python 3.12 for local validation and pipeline development + spaCy, pytest, Databricks Workspace/SQL client, Delta tables (001-nlpdata-schema)
+- Databricks Delta tables in `personal_archive_dev.nlpdata`; source inputs from `personal_archive_dev.gold` and `personal_archive_dev.memory` (001-nlpdata-schema)
+- Markdown-first planning artifacts for a Python 3.12 repository + Existing repo docs/spec workflow, pytest, `uv`, GitHub issues/projects (002-formalize-cross-repo-contract)
+- Markdown specs under `specs/`; ADRs under `docs/adr/` (002-formalize-cross-repo-contract)
+
+## Recent Changes
+- 001-nlpdata-schema: Added the local `nlpdata` pipeline, builder CLI, run metadata, and message-level search workspace contracts

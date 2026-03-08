@@ -1,0 +1,74 @@
+"""Local table contracts for the nlpdata workspace."""
+
+from __future__ import annotations
+
+TABLE_CONTRACTS: dict[str, tuple[str, ...]] = {
+    "nlp_runs": (
+        "run_id",
+        "run_scope",
+        "source_catalog",
+        "started_at",
+        "completed_at",
+        "status",
+        "input_interaction_count",
+        "output_row_counts",
+        "quality_metrics",
+    ),
+    "message_mentions": (
+        "mention_id",
+        "run_id",
+        "message_id",
+        "source_interaction_id",
+        "span_text",
+        "label",
+        "start_char",
+        "end_char",
+        "source_type",
+        "confidence",
+    ),
+    "message_person_links": (
+        "link_id",
+        "run_id",
+        "message_id",
+        "person_id",
+        "person_name",
+        "role",
+        "link_origin",
+        "confidence",
+        "evidence_type",
+        "evidence_value",
+        "source_interaction_id",
+        "is_current",
+    ),
+    "message_theme_tags": (
+        "theme_tag_id",
+        "run_id",
+        "message_id",
+        "theme",
+        "confidence",
+        "evidence",
+        "source_method",
+        "source_interaction_id",
+        "is_current",
+    ),
+    "message_search_docs": (
+        "message_id",
+        "run_id",
+        "source_interaction_id",
+        "source_type",
+        "timestamp",
+        "subject_terms",
+        "body_terms",
+        "linked_person_ids",
+        "linked_person_names",
+        "explicit_person_ids",
+        "inferred_person_ids",
+        "theme_labels",
+        "time_facets",
+        "is_current",
+    ),
+}
+
+
+def required_columns(table_name: str) -> tuple[str, ...]:
+    return TABLE_CONTRACTS[table_name]

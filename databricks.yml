@@ -1,0 +1,50 @@
+bundle:
+  name: archive_graph_spacy
+
+variables:
+  warehouse_id:
+    description: SQL Warehouse ID for nlpdata derivation
+    default: 4b799682f2bfd311
+  catalog:
+    description: Unity Catalog for derived nlpdata tables
+    default: personal_archive_dev
+  notification_email:
+    description: Email for job failures
+    default: chris@scheib.io
+  wheel_version:
+    description: Python wheel version (matches pyproject.toml)
+    default: "0.1.0"
+  wheel_path:
+    description: Workspace wheel path
+    default: ""
+
+artifacts:
+  archive_graph_spacy:
+    type: whl
+    path: .
+    build: uv build
+
+include:
+  - resources/*.yml
+
+targets:
+  dev:
+    default: true
+    mode: development
+    workspace:
+      host: https://dbc-6245a031-82ed.cloud.databricks.com
+      profile: cscheib-free-ws
+      artifact_path: /Workspace/Users/chris@scheib.io/.bundle/${bundle.name}/${bundle.target}/artifacts
+    variables:
+      catalog: personal_archive_dev
+      wheel_path: /Workspace/Users/chris@scheib.io/.bundle/archive_graph_spacy/dev/artifacts/.internal/archive_graph_spacy-${var.wheel_version}-py3-none-any.whl
+
+  sample:
+    mode: development
+    workspace:
+      host: https://dbc-6245a031-82ed.cloud.databricks.com
+      profile: cscheib-free-ws
+      artifact_path: /Workspace/Users/chris@scheib.io/.bundle/${bundle.name}/${bundle.target}/artifacts
+    variables:
+      catalog: personal_archive_sample
+      wheel_path: /Workspace/Users/chris@scheib.io/.bundle/archive_graph_spacy/sample/artifacts/.internal/archive_graph_spacy-${var.wheel_version}-py3-none-any.whl
