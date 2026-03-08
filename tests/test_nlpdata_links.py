@@ -1,5 +1,5 @@
 from archive_graph_spacy.models import Contact, Message
-from archive_graph_spacy.nlpdata.person_links import derive_person_links
+from archive_graph_spacy.nlpdata.person_links import derive_candidate_assertions, derive_person_links
 
 
 def test_derive_person_links_emits_explicit_and_inferred_rows() -> None:
@@ -69,3 +69,49 @@ def test_derive_person_links_suppresses_low_confidence_person_matches() -> None:
 
     assert not any(link.role == "mentioned" for link in links)
     assert suppressed["suppressed_low_confidence_person_link"] >= 1
+
+
+def test_derive_candidate_assertions_limits_disambiguation_to_multi_candidate_cases() -> None:
+    contacts = (
+        Contact(person_id="p-alex-a", display_name="Alex Alpha", emails=("alex.alpha@example.com",), entity_type="person"),
+        Contact(person_id="p-alex-b", display_name="Alex Beta", emails=("alex.beta@example.com",), entity_type="person"),
+        Contact(person_id="p-morgan", display_name="Morgan Lee", emails=("morgan.lee@example.com",), entity_type="person"),
+        Contact(person_id="p-alice", display_name="Alice Example", emails=("alice@example.com",), entity_type="person"),
+    )
+    messages = (
+        Message(
+            message_id="m-ambiguous",
+            source="chat",
+            sender="coordinator@example.com",
+            recipients=(),
+            subject="",
+            body="Alex is joining.",
+        ),
+        Message(
+            message_id="m-single",
+            source="chat",
+            sender="coordinator@example.com",
+            recipients=(),
+            subject="",
+            body="Morgan is joining.",
+        ),
+        Message(
+            message_id="m-clear",
+            source="chat",
+            sender="coordinator@example.com",
+            recipients=(),
+            subject="",
+            body="Alice Example is joining.",
+        ),
+    )
+
+    candidates, summary = derive_candidate_assertions(
+        messages,
+        contacts,
+        run_id="run-1",
+        generation_scope="fixture-scope",
+    )
+
+    assert [candidate.assertion_type for candidate in candidates] == ["person_link_disambiguation"]
+    assert "Alex" in candidates[0].proposed_claim
+    assert summary.emitted_candidate_count == 1

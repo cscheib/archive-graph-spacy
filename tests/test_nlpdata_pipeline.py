@@ -11,6 +11,8 @@ def test_run_pipeline_creates_current_rows() -> None:
     assert result.run.status == "completed"
     assert len(result.mentions) >= 1
     assert len(result.person_links) >= 1
+    assert result.candidate_assertions == ()
+    assert result.candidate_summary.emitted_candidate_count == 0
     assert all(link.is_current for link in result.person_links)
     assert all(document.is_current for document in result.search_docs)
 
@@ -35,6 +37,8 @@ def test_build_pipeline_payload_includes_all_contract_tables() -> None:
         "nlp_runs",
         "message_mentions",
         "message_person_links",
+        "candidate_assertions",
+        "candidate_assertions_summary",
         "message_theme_tags",
         "message_search_docs",
     }

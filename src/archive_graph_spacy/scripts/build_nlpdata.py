@@ -21,6 +21,7 @@ def build_nlpdata_from_bundle(export_dir: Path) -> dict[str, object]:
     validate_payload_contracts(payload)
     outputs_dir = write_pipeline_payload(export_dir, payload)
     run = payload["nlp_runs"][0]
+    candidate_summary = payload["candidate_assertions_summary"]
     return {
         "derived_dir": str(outputs_dir),
         "run_id": run["run_id"],
@@ -28,6 +29,7 @@ def build_nlpdata_from_bundle(export_dir: Path) -> dict[str, object]:
         "input_interaction_count": run["input_interaction_count"],
         "output_row_counts": run["output_row_counts"],
         "quality_metrics": run["quality_metrics"],
+        "candidate_assertions_summary": candidate_summary,
     }
 
 
@@ -60,8 +62,10 @@ def build_nlpdata_from_databricks(
         "nlp_runs": [result.run.to_record()],
         "message_mentions": [row.to_record() for row in result.mentions],
         "message_person_links": [row.to_record() for row in result.person_links],
+        "candidate_assertions": [row.to_record() for row in result.candidate_assertions],
         "message_theme_tags": [row.to_record() for row in result.theme_tags],
         "message_search_docs": [row.to_record() for row in result.search_docs],
+        "candidate_assertions_summary": result.candidate_summary.to_record(),
     }
     validate_payload_contracts(payload)
     outputs_dir = write_pipeline_payload(output_dir, payload)
@@ -72,6 +76,7 @@ def build_nlpdata_from_databricks(
         "input_interaction_count": result.run.input_interaction_count,
         "output_row_counts": result.run.output_row_counts,
         "quality_metrics": result.run.quality_metrics,
+        "candidate_assertions_summary": result.candidate_summary.to_record(),
     }
 
 

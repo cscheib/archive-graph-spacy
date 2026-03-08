@@ -43,5 +43,6 @@ dist/
 data_exports/
 analysis/
 data_samples/derived/
+data_samples/**/derived/
 lib/
 data_samples/*.generated.jsonl

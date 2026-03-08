@@ -47,6 +47,29 @@ accepted reviewed storage, or upstream promotion handoff. They intentionally
 separate candidate generation in this repo from durable review and override
 ownership in `archive-graph-data`.
 
+## Candidate Assertions
+
+First-wave candidate generation now runs inside the local `nlpdata` pipeline:
+
+- `relay_sender_identity` emits only for relay-like unresolved senders with a
+  supporting inferred person-link signal
+- `person_link_disambiguation` emits only for multi-candidate, no-clear-winner
+  first-name ambiguity cases
+- outputs remain pre-review and non-canonical
+
+The candidate output contract is published here:
+
+- [Candidate Assertions Spec](specs/004-candidate-assertions/spec.md)
+- [Candidate Assertions Surface Contract](specs/004-candidate-assertions/contracts/candidate-assertions-surface.md)
+
+Running `build_nlpdata` against a bundle now also writes:
+
+```text
+data_exports/<bundle>/derived/nlpdata/
+├── candidate_assertions.jsonl
+└── candidate_assertions_summary.json
+```
+
 ## Quickstart
 
 ```bash
@@ -140,6 +163,8 @@ This writes:
 
 ```text
 data_exports/<bundle>/derived/nlpdata/
+├── candidate_assertions.jsonl
+├── candidate_assertions_summary.json
 ├── nlp_runs.jsonl
 ├── message_mentions.jsonl
 ├── message_person_links.jsonl
