@@ -298,6 +298,36 @@ def _try_persist_publish_diagnostics(
         return enriched
 
 
+def _finalize_deploy_result(
+    *,
+    client: DatabricksSqlClient,
+    catalog: str,
+    schema: str,
+    run_id: str,
+    remote_dir: str,
+    warehouse_id: str,
+    profile: str | None,
+    cleanup_remote: bool,
+    diagnostics: dict[str, object],
+) -> dict[str, object]:
+    diagnostics = _try_persist_publish_diagnostics(
+        client,
+        catalog=catalog,
+        schema=schema,
+        run_id=run_id,
+        diagnostics=diagnostics,
+    )
+    if cleanup_remote:
+        cleanup_staged_directory(remote_dir, profile=profile)
+    return {
+        "catalog": catalog,
+        "schema": schema,
+        "remote_dir": remote_dir,
+        "warehouse_id": warehouse_id,
+        "publish_diagnostics": diagnostics,
+    }
+
+
 def _load_jsonl_rows(path: Path) -> list[dict[str, object]]:
     if not path.exists():
         return []
@@ -392,6 +422,7 @@ def deploy_staged_payload(
     failed_tables: list[str] = []
     recovery_action = "rerun_same_scope"
     manual_intervention_required = False
+    error_detail = ""
     for table_name, ddl in TABLE_DDLS.items():
         client.execute(ddl.format(catalog=quoted_catalog, schema=quoted_schema))
         remote_path = f"{remote_dir}/{table_name}.jsonl"
@@ -413,37 +444,12 @@ def deploy_staged_payload(
         publish_stage = "finalized"
         publish_outcome = "finalized"
         recovery_action = "none"
-    except Exception:
+    except Exception as exc:
         failed_tables = [table for table in publish_scope.affected_tables if table not in finalized_tables]
         manual_intervention_required = not publish_scope.affected_message_ids or publish_stage != "finalizing"
         publish_outcome = "partial" if finalized_tables else "failed"
         recovery_action = "manual_intervention" if manual_intervention_required else "rerun_same_scope"
-        diagnostics = build_publish_diagnostics(
-            scope=publish_scope,
-            publish_stage=publish_stage,
-            publish_outcome=publish_outcome,
-            recovery_action=recovery_action,
-            staged_path=remote_dir,
-            finalized_tables=tuple(finalized_tables),
-            failed_tables=tuple(failed_tables),
-            manual_intervention_required=manual_intervention_required,
-        ).to_record()
-        diagnostics = _try_persist_publish_diagnostics(
-            client,
-            catalog=catalog,
-            schema=schema,
-            run_id=run_id,
-            diagnostics=diagnostics,
-        )
-        if cleanup_remote:
-            cleanup_staged_directory(remote_dir, profile=profile)
-        return {
-            "catalog": catalog,
-            "schema": schema,
-            "remote_dir": remote_dir,
-            "warehouse_id": warehouse_id,
-            "publish_diagnostics": diagnostics,
-        }
+        error_detail = str(exc)
     diagnostics = build_publish_diagnostics(
         scope=publish_scope,
         publish_stage=publish_stage,
@@ -454,19 +460,16 @@ def deploy_staged_payload(
         failed_tables=tuple(failed_tables),
         manual_intervention_required=manual_intervention_required,
     ).to_record()
-    diagnostics = _try_persist_publish_diagnostics(
-        client,
+    if error_detail:
+        diagnostics["error_detail"] = error_detail
+    return _finalize_deploy_result(
+        client=client,
         catalog=catalog,
         schema=schema,
         run_id=run_id,
         diagnostics=diagnostics,
+        remote_dir=remote_dir,
+        warehouse_id=warehouse_id,
+        profile=profile,
+        cleanup_remote=cleanup_remote,
     )
-    if cleanup_remote:
-        cleanup_staged_directory(remote_dir, profile=profile)
-    return {
-        "catalog": catalog,
-        "schema": schema,
-        "remote_dir": remote_dir,
-        "warehouse_id": warehouse_id,
-        "publish_diagnostics": diagnostics,
-    }

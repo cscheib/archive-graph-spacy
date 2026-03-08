@@ -203,6 +203,7 @@ def test_deploy_staged_payload_marks_partial_failure_as_rerunnable(monkeypatch, 
     assert diagnostics["publish_outcome"] == "partial"
     assert diagnostics["recovery_action"] == "rerun_same_scope"
     assert diagnostics["manual_intervention_required"] is False
+    assert diagnostics["error_detail"] == "simulated statement failure"
     assert "message_person_links" in diagnostics["finalized_tables"]
     assert "message_theme_tags" in diagnostics["failed_tables"]
 
