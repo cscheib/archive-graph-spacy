@@ -90,6 +90,8 @@ the change.
 - Databricks Delta tables in `personal_archive_dev.nlpdata`; source inputs from `personal_archive_dev.gold` and `personal_archive_dev.memory` (001-nlpdata-schema)
 - Markdown-first planning artifacts for a Python 3.12 repository + Existing repo docs/spec workflow, pytest, `uv`, GitHub issues/projects (002-formalize-cross-repo-contract)
 - Markdown specs under `specs/`; ADRs under `docs/adr/` (002-formalize-cross-repo-contract)
+- Markdown-first planning artifacts for a Python 3.12 repository + Existing repo docs/spec workflow, cross-repo boundary contract, pytest, `uv`, GitHub issues/projects (003-reviewed-assertions-pipeline)
 
 ## Recent Changes
 - 001-nlpdata-schema: Added the local `nlpdata` pipeline, builder CLI, run metadata, and message-level search workspace contracts
+- 003-reviewed-assertions-pipeline: Added the reviewed-assertions lifecycle plan, data model, contract, quickstart, and ADR for explicit human-reviewed promotion boundaries

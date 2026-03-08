@@ -33,6 +33,20 @@ Use those documents as the source of truth for ownership, join semantics,
 provenance, reviewed assertions, and promotion boundaries instead of repeating
 that logic in local notes or issue bodies.
 
+## Reviewed Assertions Model
+
+The first reviewed-assertions lifecycle for candidate review and explicit
+promotion is also published here:
+
+- [Reviewed Assertions Spec](specs/003-reviewed-assertions-pipeline/spec.md)
+- [Reviewed Assertions Lifecycle Contract](specs/003-reviewed-assertions-pipeline/contracts/reviewed-assertions-lifecycle.md)
+- [ADR 003: Reviewed Assertions Promotion Model](docs/adr/003-reviewed-assertions-promotion-model.md)
+
+Use those documents when implementing candidate review, review decisions,
+accepted reviewed storage, or upstream promotion handoff. They intentionally
+separate candidate generation in this repo from durable review and override
+ownership in `archive-graph-data`.
+
 ## Quickstart
 
 ```bash
