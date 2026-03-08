@@ -6,7 +6,10 @@ from archive_graph_spacy.nlpdata.databricks import (
     DatabricksSqlClient,
     DatabricksSqlError,
     get_workspace_client,
+    quote_sql_string_literal,
     rows_from_result,
+    validate_iso_date,
+    validate_run_id,
 )
 
 
@@ -96,3 +99,17 @@ def test_sql_client_polls_pending_statement_until_success() -> None:
 
     assert result is succeeded
     assert calls["count"] == 1
+
+
+def test_validate_run_id_rejects_path_like_values() -> None:
+    with pytest.raises(ValueError, match="Invalid run_id"):
+        validate_run_id("../run-123")
+
+
+def test_validate_iso_date_rejects_invalid_dates() -> None:
+    with pytest.raises(ValueError, match="Invalid ISO date"):
+        validate_iso_date("2026-02-30")
+
+
+def test_quote_sql_string_literal_escapes_single_quotes() -> None:
+    assert quote_sql_string_literal("O'Brien") == "'O''Brien'"

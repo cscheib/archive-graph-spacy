@@ -5,7 +5,13 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from .databricks import DatabricksSqlClient, get_workspace_client, quote_sql_identifier
+from .databricks import (
+    DatabricksSqlClient,
+    get_workspace_client,
+    quote_sql_identifier,
+    quote_sql_string_literal,
+    validate_run_id,
+)
 
 DEFAULT_WAREHOUSE_ID = "4b799682f2bfd311"
 DEFAULT_CATALOG = "personal_archive_dev"
@@ -107,7 +113,7 @@ SELECT
   CAST(input_interaction_count AS BIGINT),
   to_json(output_row_counts),
   to_json(quality_metrics)
-FROM read_files('{remote_path}', format => 'json')
+FROM read_files({remote_path}, format => 'json')
 """.strip(),
     "message_mentions": """
 INSERT INTO {catalog}.{schema}.message_mentions
@@ -122,7 +128,7 @@ SELECT
   CAST(end_char AS INT),
   source_type,
   CAST(confidence AS DOUBLE)
-FROM read_files('{remote_path}', format => 'json')
+FROM read_files({remote_path}, format => 'json')
 """.strip(),
     "message_person_links": """
 INSERT INTO {catalog}.{schema}.message_person_links
@@ -139,7 +145,7 @@ SELECT
   evidence_value,
   source_interaction_id,
   CAST(is_current AS BOOLEAN)
-FROM read_files('{remote_path}', format => 'json')
+FROM read_files({remote_path}, format => 'json')
 """.strip(),
     "message_theme_tags": """
 INSERT INTO {catalog}.{schema}.message_theme_tags
@@ -153,7 +159,7 @@ SELECT
   source_method,
   source_interaction_id,
   CAST(is_current AS BOOLEAN)
-FROM read_files('{remote_path}', format => 'json')
+FROM read_files({remote_path}, format => 'json')
 """.strip(),
     "message_search_docs": """
 INSERT INTO {catalog}.{schema}.message_search_docs
@@ -172,7 +178,7 @@ SELECT
   from_json(to_json(theme_labels), 'array<string>'),
   from_json(to_json(time_facets), 'map<string,string>'),
   CAST(is_current AS BOOLEAN)
-FROM read_files('{remote_path}', format => 'json')
+FROM read_files({remote_path}, format => 'json')
 """.strip(),
 }
 
@@ -185,6 +191,7 @@ def _run_databricks_fs(profile: str | None, args: list[str]) -> None:
 
 
 def stage_payload_directory(local_dir: Path, run_id: str, profile: str | None = None) -> str:
+    run_id = validate_run_id(run_id)
     remote_dir = f"dbfs:/tmp/archive_graph_spacy/nlpdata/{run_id}"
     _run_databricks_fs(profile, ["cp", "-r", str(local_dir), remote_dir, "--overwrite"])
     return remote_dir
@@ -212,7 +219,7 @@ SET is_current = false
 WHERE is_current = true
   AND message_id IN (
     SELECT DISTINCT message_id
-    FROM read_files('{remote_path}', format => 'json')
+    FROM read_files({quote_sql_string_literal(remote_path)}, format => 'json')
   )
 """.strip()
 
@@ -227,6 +234,7 @@ def deploy_staged_payload(
     warehouse_id: str = DEFAULT_WAREHOUSE_ID,
     cleanup_remote: bool = True,
 ) -> dict[str, object]:
+    validate_run_id(run_id)
     workspace_client = get_workspace_client(profile)
     client = DatabricksSqlClient(workspace_client, warehouse_id=warehouse_id)
     remote_dir = stage_payload_directory(local_dir, run_id, profile=profile)
@@ -242,7 +250,7 @@ def deploy_staged_payload(
             INSERT_SELECTS[table_name].format(
                 catalog=quoted_catalog,
                 schema=quoted_schema,
-                remote_path=remote_path,
+                remote_path=quote_sql_string_literal(remote_path),
             )
         )
     if cleanup_remote:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import time
+from datetime import date
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -21,12 +22,34 @@ class DatabricksSqlError(RuntimeError):
 
 
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_RUN_ID_RE = re.compile(r"^run-[A-Za-z0-9_-]{1,64}$")
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def quote_sql_identifier(value: str) -> str:
     if not _IDENTIFIER_RE.fullmatch(value):
         raise ValueError(f"Invalid SQL identifier: {value!r}")
     return f"`{value}`"
+
+
+def validate_run_id(value: str) -> str:
+    if not _RUN_ID_RE.fullmatch(value):
+        raise ValueError(f"Invalid run_id: {value!r}")
+    return value
+
+
+def validate_iso_date(value: str) -> str:
+    if not _ISO_DATE_RE.fullmatch(value):
+        raise ValueError(f"Invalid ISO date: {value!r}")
+    try:
+        date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError(f"Invalid ISO date: {value!r}") from exc
+    return value
+
+
+def quote_sql_string_literal(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
 
 
 def get_workspace_client(profile: str | None = None) -> "WorkspaceClient":

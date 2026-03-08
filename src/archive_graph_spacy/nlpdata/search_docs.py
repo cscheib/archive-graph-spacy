@@ -11,13 +11,16 @@ from .themes import is_system_generated_message
 
 
 def _tokenize(text: str) -> tuple[str, ...]:
-    seen: list[str] = []
+    seen: set[str] = set()
+    ordered_tokens: list[str] = []
     for token in re.findall(r"[A-Za-z0-9']+", text.casefold()):
         if len(token) < 3:
             continue
-        if token not in seen:
-            seen.append(token)
-    return tuple(seen)
+        if token in seen:
+            continue
+        seen.add(token)
+        ordered_tokens.append(token)
+    return tuple(ordered_tokens)
 
 
 def _time_facets(message: Message) -> dict[str, str]:

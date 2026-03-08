@@ -1,6 +1,6 @@
 from archive_graph_spacy.models import Contact, Message
 from archive_graph_spacy.nlpdata.person_links import derive_person_links
-from archive_graph_spacy.nlpdata.search_docs import build_search_documents, query_search_documents
+from archive_graph_spacy.nlpdata.search_docs import _tokenize, build_search_documents, query_search_documents
 from archive_graph_spacy.nlpdata.themes import derive_theme_tags
 
 
@@ -87,3 +87,7 @@ def test_build_search_documents_omits_suppressed_theme_rows() -> None:
     assert themes == ()
     assert suppressed_themes["suppressed_low_confidence_theme"] >= 1
     assert documents[0].theme_labels == ()
+
+
+def test_tokenize_preserves_first_seen_order_while_deduping() -> None:
+    assert _tokenize("Alice met Bob and Alice met Carol") == ("alice", "met", "bob", "and", "carol")

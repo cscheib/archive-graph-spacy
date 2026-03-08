@@ -111,3 +111,17 @@ def test_deploy_staged_payload_rejects_invalid_catalog_identifier(monkeypatch, t
 
     with pytest.raises(ValueError, match="Invalid SQL identifier"):
         deploy_staged_payload(tmp_path, run_id="run-123", catalog="personal_archive_dev;DROP SCHEMA x")
+
+
+def test_deploy_staged_payload_rejects_invalid_run_id(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.get_workspace_client",
+        lambda profile=None: object(),
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.DatabricksSqlClient",
+        lambda workspace_client, warehouse_id: FakeSqlClient(),
+    )
+
+    with pytest.raises(ValueError, match="Invalid run_id"):
+        deploy_staged_payload(tmp_path, run_id="../run-123")

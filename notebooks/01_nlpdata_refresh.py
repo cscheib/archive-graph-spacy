@@ -32,6 +32,11 @@ else:
 # COMMAND ----------
 
 from archive_graph_spacy.nlpdata.contracts import TABLE_CONTRACTS
+from archive_graph_spacy.nlpdata.databricks import (
+    quote_sql_identifier,
+    quote_sql_string_literal,
+    validate_iso_date,
+)
 from archive_graph_spacy.nlpdata.deploy import CURRENT_STATE_TABLES, TABLE_DDLS
 from archive_graph_spacy.nlpdata.pipeline import run_pipeline
 from archive_graph_spacy.nlpdata.source_loader import source_bundle_from_rows
@@ -42,6 +47,13 @@ message_limit = dbutils.widgets.get("message_limit").strip()
 people_limit = dbutils.widgets.get("people_limit").strip()
 start_date = dbutils.widgets.get("start_date").strip() or None
 end_date = dbutils.widgets.get("end_date").strip() or None
+
+quoted_catalog = quote_sql_identifier(catalog)
+quoted_schema = quote_sql_identifier(schema)
+if start_date is not None:
+    start_date = validate_iso_date(start_date)
+if end_date is not None:
+    end_date = validate_iso_date(end_date)
 
 interaction_types = (
     "email",
@@ -58,9 +70,9 @@ message_predicates = [
     "COALESCE(i.preview, i.subject) IS NOT NULL",
 ]
 if start_date:
-    message_predicates.append(f"i.timestamp >= '{start_date}'")
+    message_predicates.append(f"i.timestamp >= {quote_sql_string_literal(start_date)}")
 if end_date:
-    message_predicates.append(f"i.timestamp < '{end_date}'")
+    message_predicates.append(f"i.timestamp < {quote_sql_string_literal(end_date)}")
 message_where = " AND ".join(message_predicates)
 message_limit_sql = f"LIMIT {int(message_limit)}" if message_limit else ""
 
@@ -77,7 +89,7 @@ message_rows = [
           COALESCE(i.preview, i.subject, '') AS body,
           CAST(i.timestamp AS STRING) AS timestamp,
           i.interaction_type
-        FROM {catalog}.gold.interactions i
+        FROM {quoted_catalog}.gold.interactions i
         WHERE {message_where}
         ORDER BY i.timestamp DESC NULLS LAST, i.global_interaction_id
         {message_limit_sql}
@@ -97,9 +109,9 @@ contact_rows = [
           p.phones,
           p.photo_url,
           COALESCE(o.entity_type_override, c.entity_type, 'unknown') AS entity_type
-        FROM {catalog}.gold.persons p
-        LEFT JOIN {catalog}.memory.entity_overrides o ON p.person_id = o.person_id
-        LEFT JOIN {catalog}.gold.entity_classification c ON p.person_id = c.person_id
+        FROM {quoted_catalog}.gold.persons p
+        LEFT JOIN {quoted_catalog}.memory.entity_overrides o ON p.person_id = o.person_id
+        LEFT JOIN {quoted_catalog}.gold.entity_classification c ON p.person_id = c.person_id
         WHERE COALESCE(p.canonical_person_id, p.person_id) = p.person_id
         ORDER BY COALESCE(p.interaction_count, 0) DESC, p.person_id
         {people_limit_sql}
@@ -127,10 +139,10 @@ payload = {
     "message_search_docs": [row.to_record() for row in result.search_docs],
 }
 
-spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}")
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {quoted_catalog}.{quoted_schema}")
 
 for table_name, ddl in TABLE_DDLS.items():
-    spark.sql(ddl.format(catalog=catalog, schema=schema))
+    spark.sql(ddl.format(catalog=quoted_catalog, schema=quoted_schema))
     rows = payload[table_name]
     if not rows:
         continue
@@ -139,7 +151,7 @@ for table_name, ddl in TABLE_DDLS.items():
     if table_name in CURRENT_STATE_TABLES:
         spark.sql(
             f"""
-            UPDATE {catalog}.{schema}.{table_name}
+            UPDATE {quoted_catalog}.{quoted_schema}.{quote_sql_identifier(table_name)}
             SET is_current = false
             WHERE is_current = true
               AND message_id IN (SELECT DISTINCT message_id FROM {temp_view})
@@ -149,7 +161,7 @@ for table_name, ddl in TABLE_DDLS.items():
     column_list = ", ".join(columns)
     spark.sql(
         f"""
-        INSERT INTO {catalog}.{schema}.{table_name} ({column_list})
+        INSERT INTO {quoted_catalog}.{quoted_schema}.{quote_sql_identifier(table_name)} ({column_list})
         SELECT {column_list}
         FROM {temp_view}
         """
