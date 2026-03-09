@@ -104,6 +104,74 @@ CREATE TABLE IF NOT EXISTS {catalog}.{schema}.message_search_docs (
 """.strip(),
 }
 
+TABLE_COLUMN_TYPES: dict[str, dict[str, str]] = {
+    "nlp_runs": {
+        "run_id": "STRING",
+        "run_scope": "STRING",
+        "source_catalog": "STRING",
+        "started_at": "TIMESTAMP",
+        "completed_at": "TIMESTAMP",
+        "status": "STRING",
+        "input_interaction_count": "BIGINT",
+        "output_row_counts": "STRING",
+        "quality_metrics": "STRING",
+        "publish_diagnostics": "STRING",
+    },
+    "message_mentions": {
+        "mention_id": "STRING",
+        "run_id": "STRING",
+        "message_id": "STRING",
+        "source_interaction_id": "STRING",
+        "span_text": "STRING",
+        "label": "STRING",
+        "start_char": "INT",
+        "end_char": "INT",
+        "source_type": "STRING",
+        "confidence": "DOUBLE",
+    },
+    "message_person_links": {
+        "link_id": "STRING",
+        "run_id": "STRING",
+        "message_id": "STRING",
+        "person_id": "STRING",
+        "person_name": "STRING",
+        "role": "STRING",
+        "link_origin": "STRING",
+        "confidence": "DOUBLE",
+        "evidence_type": "STRING",
+        "evidence_value": "STRING",
+        "source_interaction_id": "STRING",
+        "is_current": "BOOLEAN",
+    },
+    "message_theme_tags": {
+        "theme_tag_id": "STRING",
+        "run_id": "STRING",
+        "message_id": "STRING",
+        "theme": "STRING",
+        "confidence": "DOUBLE",
+        "evidence": "STRING",
+        "source_method": "STRING",
+        "source_interaction_id": "STRING",
+        "is_current": "BOOLEAN",
+    },
+    "message_search_docs": {
+        "message_id": "STRING",
+        "run_id": "STRING",
+        "source_interaction_id": "STRING",
+        "source_type": "STRING",
+        "timestamp": "TIMESTAMP",
+        "subject_terms": "ARRAY<STRING>",
+        "body_terms": "ARRAY<STRING>",
+        "linked_person_ids": "ARRAY<STRING>",
+        "linked_person_names": "ARRAY<STRING>",
+        "explicit_person_ids": "ARRAY<STRING>",
+        "inferred_person_ids": "ARRAY<STRING>",
+        "theme_labels": "ARRAY<STRING>",
+        "time_facets": "MAP<STRING, STRING>",
+        "is_current": "BOOLEAN",
+    },
+}
+
 INSERT_SELECTS: dict[str, str] = {
     "nlp_runs": """
 INSERT INTO {catalog}.{schema}.nlp_runs
@@ -208,6 +276,47 @@ def cleanup_staged_directory(remote_dir: str, profile: str | None = None) -> Non
 
 def _schema_sql(catalog: str, schema: str) -> str:
     return f"CREATE SCHEMA IF NOT EXISTS {quote_sql_identifier(catalog)}.{quote_sql_identifier(schema)}"
+
+
+def missing_contract_columns(
+    table_name: str,
+    existing_columns: set[str],
+) -> list[tuple[str, str]]:
+    return [
+        (column_name, column_type)
+        for column_name, column_type in TABLE_COLUMN_TYPES[table_name].items()
+        if column_name not in existing_columns
+    ]
+
+
+def _add_missing_columns_sql(
+    catalog: str,
+    schema: str,
+    table_name: str,
+    existing_columns: set[str],
+) -> str | None:
+    missing_columns = missing_contract_columns(table_name, existing_columns)
+    if not missing_columns:
+        return None
+    qualified_table = ".".join(
+        (
+            quote_sql_identifier(catalog),
+            quote_sql_identifier(schema),
+            quote_sql_identifier(table_name),
+        )
+    )
+    add_columns_sql = ", ".join(
+        f"{quote_sql_identifier(column_name)} {column_type}"
+        for column_name, column_type in missing_columns
+    )
+    return f"ALTER TABLE {qualified_table} ADD COLUMNS ({add_columns_sql})"
+
+
+def _show_columns_sql(catalog: str, schema: str, table_name: str) -> str:
+    return (
+        f"SHOW COLUMNS IN "
+        f"{quote_sql_identifier(catalog)}.{quote_sql_identifier(schema)}.{quote_sql_identifier(table_name)}"
+    )
 
 
 def _deactivate_current_rows_sql(catalog: str, schema: str, table_name: str, remote_path: str) -> str:
@@ -425,6 +534,14 @@ def deploy_staged_payload(
     error_detail = ""
     for table_name, ddl in TABLE_DDLS.items():
         client.execute(ddl.format(catalog=quoted_catalog, schema=quoted_schema))
+        existing_column_rows = client.fetch_all(_show_columns_sql(catalog, schema, table_name))
+        existing_columns = {
+            str(row.get("col_name") or next(iter(row.values()), ""))
+            for row in existing_column_rows
+        }
+        alter_sql = _add_missing_columns_sql(catalog, schema, table_name, existing_columns)
+        if alter_sql is not None:
+            client.execute(alter_sql)
         remote_path = f"{remote_dir}/{table_name}.jsonl"
         client.execute(
             _staged_insert_sql(

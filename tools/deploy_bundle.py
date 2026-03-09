@@ -9,8 +9,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT_PATH = REPO_ROOT / "pyproject.toml"
+DIST_PATH = REPO_ROOT / "dist"
 VERSION_RE = re.compile(r'(?m)^version = "(?P<version>[^"]+)"$')
 WHEEL_INPUTS = ("README.md", "pyproject.toml", "src/archive_graph_spacy")
+PACKAGE_NAME = "archive_graph_spacy"
 
 
 def read_project_version(pyproject_text: str) -> str:
@@ -63,12 +65,24 @@ def run_command(args: list[str]) -> None:
     subprocess.run(args, cwd=REPO_ROOT, check=True)
 
 
+def remove_stale_build_artifacts() -> None:
+    if not DIST_PATH.exists():
+        return
+    for artifact in DIST_PATH.glob(f"{PACKAGE_NAME}-*"):
+        artifact.unlink()
+
+
+def expected_wheel_path(version: str) -> Path:
+    return DIST_PATH / f"{PACKAGE_NAME}-{version}-py3-none-any.whl"
+
+
 def deploy_bundle(target: str) -> str:
     original_text = PYPROJECT_PATH.read_text()
     base_version = read_project_version(original_text)
     deploy_version = build_deploy_version(base_version)
     PYPROJECT_PATH.write_text(replace_project_version(original_text, deploy_version))
     try:
+        remove_stale_build_artifacts()
         run_command(
             [
                 "databricks",
@@ -80,6 +94,10 @@ def deploy_bundle(target: str) -> str:
                 f"wheel_version={deploy_version}",
             ]
         )
+        if not expected_wheel_path(deploy_version).exists():
+            raise FileNotFoundError(
+                f"Expected built wheel not found after deploy: {expected_wheel_path(deploy_version)}"
+            )
     finally:
         PYPROJECT_PATH.write_text(original_text)
     return deploy_version

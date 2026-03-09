@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from archive_graph_spacy.nlpdata.spark_views import (
     create_temp_view_from_rows,
+    ordered_rows_for_table,
     spark_schema_for_table,
 )
 
@@ -66,20 +67,78 @@ def test_create_temp_view_from_rows_supplies_explicit_schema() -> None:
 
     assert spark.calls == [
         {
-            "rows": rows,
+            "rows": [
+                (
+                    "m-001",
+                    "run-123",
+                    "src-001",
+                    "email",
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    True,
+                )
+            ],
             "schema": spark_schema_for_table("message_search_docs"),
         }
     ]
     assert spark.dataframe.temp_view == "tmp_message_search_docs"
 
 
+def test_ordered_rows_for_nlp_runs_preserves_publish_diagnostics_column() -> None:
+    rows = [
+        {
+            "run_id": "run-123",
+            "run_scope": "scope",
+            "source_catalog": "personal_archive_dev",
+            "started_at": "2026-03-08T00:00:00+00:00",
+            "completed_at": "2026-03-08T00:01:00+00:00",
+            "status": "completed",
+            "input_interaction_count": 100,
+            "output_row_counts": "{\"message_mentions\": 1}",
+            "quality_metrics": "{\"runtime_seconds\": 1.0}",
+            "publish_diagnostics": "{\"publish_outcome\": \"staged\"}",
+        }
+    ]
+
+    assert ordered_rows_for_table("nlp_runs", rows) == [
+        (
+            "run-123",
+            "scope",
+            "personal_archive_dev",
+            "2026-03-08T00:00:00+00:00",
+            "2026-03-08T00:01:00+00:00",
+            "completed",
+            100,
+            "{\"message_mentions\": 1}",
+            "{\"runtime_seconds\": 1.0}",
+            "{\"publish_outcome\": \"staged\"}",
+        )
+    ]
+
+
 def test_refresh_notebook_uses_typed_temp_view_helper() -> None:
     notebook = Path("notebooks/01_nlpdata_refresh.py").read_text(encoding="utf-8")
 
     assert "from archive_graph_spacy.nlpdata.spark_views import create_temp_view_from_rows" in notebook
+    assert "from archive_graph_spacy.nlpdata.deploy import _add_missing_columns_sql, _show_columns_sql" in notebook
     assert "create_temp_view_from_rows(" in notebook
     assert "spark.createDataFrame(rows).createOrReplaceTempView(temp_view)" not in notebook
     assert '"publish_diagnostics": json.dumps(result.run.publish_diagnostics)' in notebook
+    assert 'subprocess.check_call(["pip", "install", wheel_path])' in notebook
+    assert "os.path.exists(wheel_path)" not in notebook
+    assert "spark.sql(_show_columns_sql(catalog, schema, table_name)).collect()" in notebook
+    assert "alter_sql = _add_missing_columns_sql(catalog, schema, table_name, existing_columns)" in notebook
+    assert "if alter_sql is not None:" in notebook
+    assert "spark.sql(alter_sql)" in notebook
+    assert 'if table_name == "nlp_runs":' in notebook
+    assert "CREATE OR REPLACE TEMP VIEW" in notebook
 
 
 @pytest.mark.skipif(

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from .contracts import TABLE_CONTRACTS
+
+
 SPARK_TABLE_SCHEMAS: dict[str, str] = {
     "nlp_runs": """
 run_id STRING,
@@ -101,6 +104,11 @@ def spark_schema_for_table(table_name: str) -> str:
         raise KeyError(f"Unsupported Spark temp-view table: {table_name}") from exc
 
 
+def ordered_rows_for_table(table_name: str, rows: list[dict[str, object]]) -> list[tuple[object, ...]]:
+    columns = TABLE_CONTRACTS[table_name]
+    return [tuple(row.get(column) for column in columns) for row in rows]
+
+
 def create_temp_view_from_rows(
     spark: object,
     *,
@@ -109,4 +117,5 @@ def create_temp_view_from_rows(
     temp_view: str,
 ) -> None:
     schema = spark_schema_for_table(table_name)
-    spark.createDataFrame(rows, schema=schema).createOrReplaceTempView(temp_view)
+    ordered_rows = ordered_rows_for_table(table_name, rows)
+    spark.createDataFrame(ordered_rows, schema=schema).createOrReplaceTempView(temp_view)

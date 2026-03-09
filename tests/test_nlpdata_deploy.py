@@ -13,15 +13,25 @@ from archive_graph_spacy.nlpdata.deploy import (
 
 
 class FakeSqlClient:
-    def __init__(self, *, fail_on_statement: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        fail_on_statement: str | None = None,
+        show_columns: dict[str, list[dict[str, object]]] | None = None,
+    ) -> None:
         self.statements: list[str] = []
         self.fail_on_statement = fail_on_statement
+        self.show_columns = show_columns or {}
 
     def execute(self, statement: str) -> dict[str, object]:
         if self.fail_on_statement and self.fail_on_statement in statement:
             raise RuntimeError("simulated statement failure")
         self.statements.append(statement)
         return {"status": {"state": "SUCCEEDED"}}
+
+    def fetch_all(self, statement: str) -> list[dict[str, object]]:
+        self.statements.append(statement)
+        return self.show_columns.get(statement, [])
 
 
 def _write_payload_fixture(tmp_path: Path, run_id: str = "run-123") -> None:
@@ -177,6 +187,47 @@ def test_deploy_staged_payload_creates_schema_and_merges_current_tables(monkeypa
     activate_index = max(i for i, stmt in enumerate(sql_client.statements) if "SET is_current = true" in stmt and "`message_person_links`" in stmt)
     assert insert_index < deactivate_index < activate_index
     assert "false" in sql_client.statements[insert_index]
+
+
+def test_deploy_staged_payload_adds_missing_contract_columns(monkeypatch, tmp_path: Path) -> None:
+    _write_payload_fixture(tmp_path)
+
+    sql_client = FakeSqlClient(
+        show_columns={
+            "SHOW COLUMNS IN `personal_archive_dev`.`nlpdata`.`nlp_runs`": [
+                {"col_name": "run_id"},
+                {"col_name": "run_scope"},
+                {"col_name": "source_catalog"},
+                {"col_name": "started_at"},
+                {"col_name": "completed_at"},
+            ]
+        }
+    )
+
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.get_workspace_client",
+        lambda profile=None: object(),
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.DatabricksSqlClient",
+        lambda workspace_client, warehouse_id: sql_client,
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.stage_payload_directory",
+        lambda local_dir, run_id, profile=None: "dbfs:/tmp/archive_graph_spacy/nlpdata/run-123",
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.cleanup_staged_directory",
+        lambda remote_dir, profile=None: None,
+    )
+
+    deploy_staged_payload(tmp_path, run_id="run-123")
+
+    assert any(
+        "ALTER TABLE `personal_archive_dev`.`nlpdata`.`nlp_runs` ADD COLUMNS" in stmt
+        and "`publish_diagnostics` STRING" in stmt
+        for stmt in sql_client.statements
+    )
 
 
 def test_deploy_staged_payload_marks_partial_failure_as_rerunnable(monkeypatch, tmp_path: Path) -> None:

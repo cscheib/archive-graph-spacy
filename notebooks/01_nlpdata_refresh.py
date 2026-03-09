@@ -15,7 +15,6 @@ dbutils.widgets.text("end_date", "", "End Date")
 
 # COMMAND ----------
 
-import os
 import json
 import subprocess
 
@@ -24,10 +23,7 @@ if not wheel_path:
     raise ValueError("wheel_path parameter is required.")
 
 print(f"Installing wheel from: {wheel_path}")
-if os.path.exists(wheel_path):
-    subprocess.check_call(["pip", "install", wheel_path])
-else:
-    raise FileNotFoundError(f"Wheel not found at {wheel_path}")
+subprocess.check_call(["pip", "install", wheel_path])
 
 # COMMAND ----------
 
@@ -38,6 +34,7 @@ from archive_graph_spacy.nlpdata.databricks import (
     validate_iso_date,
 )
 from archive_graph_spacy.nlpdata.deploy import CURRENT_STATE_TABLES, TABLE_DDLS
+from archive_graph_spacy.nlpdata.deploy import _add_missing_columns_sql, _show_columns_sql
 from archive_graph_spacy.nlpdata.pipeline import run_pipeline
 from archive_graph_spacy.nlpdata.spark_views import create_temp_view_from_rows
 from archive_graph_spacy.nlpdata.source_loader import source_bundle_from_rows
@@ -55,6 +52,16 @@ if start_date is not None:
     start_date = validate_iso_date(start_date)
 if end_date is not None:
     end_date = validate_iso_date(end_date)
+
+
+def sql_literal(value: object) -> str:
+    if value is None:
+        return "NULL"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    return quote_sql_string_literal(str(value))
 
 interaction_types = (
     "email",
@@ -145,16 +152,34 @@ spark.sql(f"CREATE SCHEMA IF NOT EXISTS {quoted_catalog}.{quoted_schema}")
 
 for table_name, ddl in TABLE_DDLS.items():
     spark.sql(ddl.format(catalog=quoted_catalog, schema=quoted_schema))
+    existing_column_rows = spark.sql(_show_columns_sql(catalog, schema, table_name)).collect()
+    existing_columns = {str(row["col_name"]) for row in existing_column_rows}
+    alter_sql = _add_missing_columns_sql(catalog, schema, table_name, existing_columns)
+    if alter_sql is not None:
+        spark.sql(alter_sql)
     rows = payload[table_name]
     if not rows:
         continue
     temp_view = f"tmp_{table_name}"
-    create_temp_view_from_rows(
-        spark,
-        table_name=table_name,
-        rows=rows,
-        temp_view=temp_view,
-    )
+    if table_name == "nlp_runs":
+        select_list = ",\n          ".join(
+            f"{sql_literal(rows[0][column])} AS {quote_sql_identifier(column)}"
+            for column in TABLE_CONTRACTS[table_name]
+        )
+        spark.sql(
+            f"""
+            CREATE OR REPLACE TEMP VIEW {quote_sql_identifier(temp_view)} AS
+            SELECT
+              {select_list}
+            """
+        )
+    else:
+        create_temp_view_from_rows(
+            spark,
+            table_name=table_name,
+            rows=rows,
+            temp_view=temp_view,
+        )
     if table_name in CURRENT_STATE_TABLES:
         spark.sql(
             f"""
