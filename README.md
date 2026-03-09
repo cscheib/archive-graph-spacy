@@ -217,12 +217,16 @@ Databricks Asset Bundle:
 ```bash
 databricks bundle validate -t dev
 databricks bundle deploy -t dev
+uv run python tools/deploy_bundle.py dev
 databricks bundle run -t dev nlpdata_refresh
 ```
 
 The bundle deploys the project wheel plus a notebook-driven refresh job that
 uses Spark SQL to read directly from `personal_archive_dev.gold` and
 `personal_archive_dev.memory`, then writes `personal_archive_dev.nlpdata`.
+
+Use `uv run python tools/deploy_bundle.py dev` when packaged Python code has
+changed and you need a fresh wheel path for Databricks serverless caching.
 
 For the agreed historical backfill windows, use the canned sequential job:
 

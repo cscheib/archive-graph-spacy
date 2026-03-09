@@ -31,6 +31,9 @@ not source material.
   validate the Databricks Asset Bundle in [databricks.yml](databricks.yml).
 - `databricks bundle deploy -t dev`:
   deploy the project wheel and `nlpdata_refresh` job resources to Databricks.
+- `uv run python tools/deploy_bundle.py dev`:
+  deploy the Databricks bundle with a wheel version derived from current wheel
+  contents, so the wheel path only changes when packaged code changes.
 - `databricks bundle run -t dev nlpdata_refresh`:
   execute the bundle-managed refresh job against Databricks source tables.
 - `uv run python -m archive_graph_spacy.scripts.run_export data_exports/<name>`:

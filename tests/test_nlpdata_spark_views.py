@@ -79,6 +79,7 @@ def test_refresh_notebook_uses_typed_temp_view_helper() -> None:
     assert "from archive_graph_spacy.nlpdata.spark_views import create_temp_view_from_rows" in notebook
     assert "create_temp_view_from_rows(" in notebook
     assert "spark.createDataFrame(rows).createOrReplaceTempView(temp_view)" not in notebook
+    assert '"publish_diagnostics": json.dumps(result.run.publish_diagnostics)' in notebook
 
 
 @pytest.mark.skipif(

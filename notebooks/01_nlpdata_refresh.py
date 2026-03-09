@@ -132,6 +132,7 @@ payload = {
             **result.run.to_record(),
             "output_row_counts": json.dumps(result.run.output_row_counts),
             "quality_metrics": json.dumps(result.run.quality_metrics),
+            "publish_diagnostics": json.dumps(result.run.publish_diagnostics),
         }
     ],
     "message_mentions": [row.to_record() for row in result.mentions],
