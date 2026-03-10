@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from archive_graph_spacy.models import Contact, Message
 from archive_graph_spacy.nlpdata.pipeline import build_pipeline_payload, run_pipeline
-from archive_graph_spacy.nlpdata.person_links import derive_candidate_assertions
+from archive_graph_spacy.nlpdata.person_links import _normalized_reviewed_inputs, derive_candidate_assertions
 from archive_graph_spacy.nlpdata.source_loader import load_source_bundle
 
 
@@ -111,3 +111,21 @@ def test_relationship_evidence_review_candidates_use_shared_candidate_contract()
     assert candidates[0].review_class == "reviewable"
     assert candidates[0].promotion_class == "derived_only"
     assert any(ref.startswith("pair:") for ref in candidates[0].evidence_refs)
+
+
+def test_normalized_reviewed_inputs_parses_stringified_evidence_refs() -> None:
+    reviewed = _normalized_reviewed_inputs(
+        (
+            {
+                "candidate_assertion_id": "ca-1",
+                "assertion_type": "relay_sender_identity",
+                "subject_canonical_id": "m-1",
+                "proposed_claim": "relay sender relay+one@example.com maps to p-1",
+                "current_review_state": "accepted",
+                "evidence_refs": '["message:m-1","sender:relay+one@example.com"]',
+            },
+        ),
+        (),
+    )
+
+    assert reviewed[0]["evidence_refs"] == ("message:m-1", "sender:relay+one@example.com")

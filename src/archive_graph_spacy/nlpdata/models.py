@@ -228,12 +228,14 @@ class BoundedPublishScope:
     run_id: str
     run_scope: str
     affected_message_ids: tuple[str, ...]
-    affected_tables: tuple[str, ...]
     overlap_class: str
+    affected_identity_values: tuple[str, ...] = ()
+    affected_tables: tuple[str, ...] = ()
 
     def to_record(self) -> dict[str, object]:
         payload = asdict(self)
         payload["affected_message_ids"] = list(self.affected_message_ids)
+        payload["affected_identity_values"] = list(self.affected_identity_values)
         payload["affected_tables"] = list(self.affected_tables)
         return payload
 

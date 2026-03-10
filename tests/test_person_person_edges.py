@@ -48,3 +48,4 @@ def test_build_nlpdata_person_person_outputs_creates_canonical_pair_summary_and_
     assert pair.indirect_evidence_count >= 1
     assert pair.is_current is True
     assert any(row.pair_id == pair.pair_id and row.rank_within_pair >= 1 for row in evidence)
+    assert len([row for row in evidence if row.pair_id == pair.pair_id]) <= 5

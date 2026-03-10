@@ -242,6 +242,21 @@ def test_deploy_staged_payload_creates_schema_and_merges_current_tables(monkeypa
     assert "false" in sql_client.statements[insert_index]
 
 
+def test_collect_bounded_publish_scope_tracks_non_message_identity_values(tmp_path: Path) -> None:
+    _write_payload_fixture(tmp_path)
+
+    from archive_graph_spacy.nlpdata.deploy import _collect_bounded_publish_scope
+
+    scope = _collect_bounded_publish_scope(
+        tmp_path,
+        run_id="run-123",
+        active_scope_message_ids=(),
+    )
+
+    assert "person_person_edges:pair-001" in scope.affected_identity_values
+    assert "m-001" in scope.affected_message_ids
+
+
 def test_deploy_staged_payload_adds_missing_contract_columns(monkeypatch, tmp_path: Path) -> None:
     _write_payload_fixture(tmp_path)
 

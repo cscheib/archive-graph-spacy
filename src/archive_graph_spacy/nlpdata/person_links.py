@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from collections import defaultdict
 from datetime import timezone, datetime
 from dataclasses import dataclass
@@ -22,12 +21,11 @@ from .models import (
     ReviewedEffectResult,
 )
 from .runs import semantic_replay_key
-from .source_loader import contact_email_index, effective_person_contacts
+from .source_loader import _ensure_list, contact_email_index, effective_person_contacts
 
 MIN_PERSON_LINK_CONFIDENCE = 0.5
 MIN_RELAY_CANDIDATE_CONFIDENCE = 0.75
 RELATIONSHIP_REVIEW_MIN_SCORE = 0.75
-PAIR_CLAIM_MESSAGE = re.compile(r"pair\s+([a-z0-9-]+)\s+", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -346,8 +344,9 @@ def derive_candidate_assertions(
     pair_evidence: dict[tuple[str, str], dict[str, object]] = {}
     for context in contexts:
         direct_participants = set(context.explicit_participants)
-        for idx, left in enumerate(sorted(direct_participants)):
-            for right in sorted(direct_participants)[idx + 1 :]:
+        sorted_participants = sorted(direct_participants)
+        for idx, left in enumerate(sorted_participants):
+            for right in sorted_participants[idx + 1 :]:
                 pair_key = tuple(sorted((left, right)))
                 record = pair_evidence.setdefault(
                     pair_key,
@@ -416,7 +415,8 @@ def _normalized_reviewed_inputs(
             "subject_canonical_id": str(row.get("subject_canonical_id") or ""),
             "proposed_claim": str(row.get("proposed_claim") or ""),
             "review_state": str(row.get("current_review_state") or ""),
-            "evidence_refs": tuple(str(item) for item in row.get("evidence_refs") or ()),
+            "generation_scope": None if row.get("generation_scope") in (None, "") else str(row.get("generation_scope")),
+            "evidence_refs": _ensure_list(row.get("evidence_refs")),
         }
     for row in review_assertion_decisions:
         candidate_id = str(row.get("candidate_assertion_id") or "")
@@ -440,20 +440,36 @@ def _normalized_reviewed_inputs(
             "subject_canonical_id": str(parsed.get("subject_canonical_id") or ""),
             "proposed_claim": str(parsed.get("proposed_claim") or ""),
             "review_state": str(row.get("decision_state") or ""),
+            "generation_scope": None if parsed.get("generation_scope") in (None, "") else str(parsed.get("generation_scope")),
             "evidence_refs": (),
         }
     return list(by_candidate.values())
 
 
-def _semantic_key_from_values(assertion_type: str, subject_canonical_id: str, proposed_claim: str) -> str:
+def _semantic_key_from_values(
+    assertion_type: str,
+    subject_canonical_id: str,
+    proposed_claim: str,
+    generation_scope: str | None = None,
+) -> str:
     return semantic_replay_key(
         assertion_type=assertion_type,
         subject_canonical_id=subject_canonical_id,
         proposed_claim=proposed_claim,
+        generation_scope=generation_scope,
     )
 
 
 def _candidate_semantic_key(candidate: CandidateAssertion) -> str:
+    return _semantic_key_from_values(
+        candidate.assertion_type,
+        candidate.subject_canonical_id,
+        candidate.proposed_claim,
+        candidate.generation_scope,
+    )
+
+
+def _candidate_legacy_semantic_key(candidate: CandidateAssertion) -> str:
     return _semantic_key_from_values(
         candidate.assertion_type,
         candidate.subject_canonical_id,
@@ -466,6 +482,7 @@ def _reviewed_semantic_key(reviewed: dict[str, object]) -> str:
         str(reviewed.get("assertion_type") or ""),
         str(reviewed.get("subject_canonical_id") or ""),
         str(reviewed.get("proposed_claim") or ""),
+        str(reviewed.get("generation_scope") or "") or None,
     )
 
 
@@ -500,17 +517,6 @@ def _reviewed_relay_link(
     )
 
 
-def _reviewed_relationship_pair_id(reviewed: dict[str, object]) -> str | None:
-    subject = str(reviewed.get("subject_canonical_id") or "")
-    if "|" in subject:
-        return subject
-    proposed_claim = str(reviewed.get("proposed_claim") or "")
-    match = PAIR_CLAIM_MESSAGE.search(proposed_claim)
-    if not match:
-        return None
-    return match.group(1).strip() or None
-
-
 def apply_reviewed_feedback(
     *,
     run_id: str,
@@ -521,7 +527,12 @@ def apply_reviewed_feedback(
 ) -> tuple[tuple[CandidateAssertion, ...], tuple[ReviewedEffectResult, ...], tuple[PersonMessageLink, ...]]:
     reviewed_inputs = _normalized_reviewed_inputs(reviewed_assertions, review_assertion_decisions)
     by_candidate_id = {candidate.candidate_assertion_id: candidate for candidate in candidate_assertions}
-    by_semantic_key = {_candidate_semantic_key(candidate): candidate for candidate in candidate_assertions}
+    by_semantic_key = {
+        _candidate_semantic_key(candidate): candidate for candidate in candidate_assertions
+    }
+    by_legacy_semantic_key = {
+        _candidate_legacy_semantic_key(candidate): candidate for candidate in candidate_assertions
+    }
     by_subject_family: dict[tuple[str, str], list[CandidateAssertion]] = defaultdict(list)
     for candidate in candidate_assertions:
         by_subject_family[(candidate.assertion_type, candidate.subject_canonical_id)].append(candidate)
@@ -536,8 +547,17 @@ def apply_reviewed_feedback(
         subject_canonical_id = str(reviewed.get("subject_canonical_id") or "")
         review_state = str(reviewed.get("decision_state") or reviewed.get("review_state") or "")
         matched = by_candidate_id.get(candidate_id)
+        reviewed_key = _reviewed_semantic_key(reviewed)
         if matched is None:
-            matched = by_semantic_key.get(_reviewed_semantic_key(reviewed))
+            matched = by_semantic_key.get(reviewed_key)
+        if matched is None and not reviewed.get("generation_scope"):
+            matched = by_legacy_semantic_key.get(
+                _semantic_key_from_values(
+                    assertion_type,
+                    subject_canonical_id,
+                    str(reviewed.get("proposed_claim") or ""),
+                )
+            )
         if matched is None:
             possible_conflicts = by_subject_family.get((assertion_type, subject_canonical_id), [])
             if possible_conflicts and review_state == "accepted":
@@ -568,6 +588,29 @@ def apply_reviewed_feedback(
 
         remaining.pop(matched.candidate_assertion_id, None)
         if review_state == "accepted":
+            candidate_matches_review = _candidate_semantic_key(matched) == reviewed_key
+            legacy_candidate_matches_review = (
+                not reviewed.get("generation_scope")
+                and _candidate_legacy_semantic_key(matched)
+                == _semantic_key_from_values(
+                    assertion_type,
+                    subject_canonical_id,
+                    str(reviewed.get("proposed_claim") or ""),
+                )
+            )
+            if not (candidate_matches_review or legacy_candidate_matches_review):
+                reviewed_effects.append(
+                    ReviewedEffectResult(
+                        run_id=run_id,
+                        candidate_assertion_id=matched.candidate_assertion_id,
+                        assertion_type=matched.assertion_type,
+                        subject_canonical_id=matched.subject_canonical_id,
+                        result="conflicted",
+                        reason_code="semantic_mismatch",
+                        details="accepted reviewed outcome matched by candidate id but conflicts with regenerated semantics",
+                    )
+                )
+                continue
             link = None
             if matched.assertion_type == "relay_sender_identity":
                 link = _reviewed_relay_link(reviewed=reviewed, run_id=run_id, contacts=contacts)
@@ -611,9 +654,19 @@ def apply_reviewed_feedback(
             )
 
     return (
-        tuple(remaining.values()),
-        tuple(reviewed_effects),
-        tuple(extra_links.values()),
+        tuple(sorted(remaining.values(), key=lambda candidate: candidate.candidate_assertion_id)),
+        tuple(
+            sorted(
+                reviewed_effects,
+                key=lambda effect: (
+                    effect.result,
+                    effect.assertion_type,
+                    effect.subject_canonical_id,
+                    effect.candidate_assertion_id,
+                ),
+            )
+        ),
+        tuple(sorted(extra_links.values(), key=lambda link: (link.message_id, link.person_id, link.role))),
     )
 
 
