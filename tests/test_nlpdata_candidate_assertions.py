@@ -93,3 +93,21 @@ def test_repeated_ambiguous_mentions_emit_distinct_candidates() -> None:
     assert candidates[0].proposed_claim != candidates[1].proposed_claim
     assert all(any(ref.startswith("mention:") for ref in candidate.evidence_refs) for candidate in candidates)
     assert summary.emitted_candidate_count == 2
+
+
+def test_relationship_evidence_review_candidates_use_shared_candidate_contract() -> None:
+    result = run_pipeline(
+        load_source_bundle("data_samples/feedback_relationship_outputs"),
+        run_scope="data_samples/feedback_relationship_outputs",
+    )
+
+    candidates = [
+        candidate
+        for candidate in result.candidate_assertions
+        if candidate.assertion_type == "relationship_evidence_review"
+    ]
+
+    assert len(candidates) == 1
+    assert candidates[0].review_class == "reviewable"
+    assert candidates[0].promotion_class == "derived_only"
+    assert any(ref.startswith("pair:") for ref in candidates[0].evidence_refs)

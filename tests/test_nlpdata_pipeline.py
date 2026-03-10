@@ -1,5 +1,5 @@
 from archive_graph_spacy.nlpdata.pipeline import build_pipeline_payload, run_pipeline
-from archive_graph_spacy.nlpdata.runs import meets_runtime_goal
+from archive_graph_spacy.nlpdata.runs import meets_runtime_goal, semantic_replay_key
 from archive_graph_spacy.nlpdata.source_loader import load_source_bundle
 from archive_graph_spacy.models import Contact, Message
 from archive_graph_spacy.nlpdata.models import SourceBundle
@@ -11,8 +11,8 @@ def test_run_pipeline_creates_current_rows() -> None:
     assert result.run.status == "completed"
     assert len(result.mentions) >= 1
     assert len(result.person_links) >= 1
-    assert result.candidate_assertions == ()
-    assert result.candidate_summary.emitted_candidate_count == 0
+    assert result.candidate_summary.emitted_candidate_count == len(result.candidate_assertions)
+    assert {candidate.assertion_type for candidate in result.candidate_assertions} == {"relationship_evidence_review"}
     assert all(link.is_current for link in result.person_links)
     assert all(document.is_current for document in result.search_docs)
 
@@ -39,6 +39,9 @@ def test_build_pipeline_payload_includes_all_contract_tables() -> None:
         "message_person_links",
         "candidate_assertions",
         "candidate_assertions_summary",
+        "reviewed_effects",
+        "person_person_edges",
+        "person_person_edge_evidence",
         "message_theme_tags",
         "message_search_docs",
     }
@@ -81,3 +84,38 @@ def test_run_pipeline_suppresses_system_generated_and_unresolved_results() -> No
     assert result.run.quality_metrics["suppressed_system_generated_search_document"] >= 1
     assert result.run.quality_metrics["suppressed_empty_search_document"] >= 1
     assert result.search_docs == ()
+
+
+def test_run_pipeline_consumes_reviewed_feedback_and_emits_pair_outputs() -> None:
+    result = run_pipeline(
+        load_source_bundle("data_samples/feedback_relationship_outputs"),
+        run_scope="data_samples/feedback_relationship_outputs",
+    )
+
+    candidate_types = {candidate.assertion_type for candidate in result.candidate_assertions}
+    reviewed_by_result = {effect.result for effect in result.reviewed_effects}
+
+    assert "relay_sender_identity" in candidate_types
+    assert "relationship_evidence_review" in candidate_types
+    assert "applied" in reviewed_by_result
+    assert "suppressed" in reviewed_by_result
+    assert result.candidate_summary.reviewed_effect_counts["applied"] >= 1
+    assert result.candidate_summary.reviewed_effect_counts["suppressed"] >= 1
+    assert any(link.link_origin == "reviewed" and link.role == "sender" for link in result.person_links)
+    assert any(edge.person_a_id == "p-alice" and edge.person_b_id == "p-bob" for edge in result.person_person_edges)
+    assert any(row.evidence_family == "message_mention" for row in result.person_person_edge_evidence)
+
+
+def test_semantic_replay_key_tolerates_mention_identifier_drift() -> None:
+    first = semantic_replay_key(
+        assertion_type="person_link_disambiguation",
+        subject_canonical_id="m-ambiguous-jamie",
+        proposed_claim="mention mm-123abc 'Jamie' is ambiguous across p-jamie-a, p-jamie-b",
+    )
+    second = semantic_replay_key(
+        assertion_type="person_link_disambiguation",
+        subject_canonical_id="m-ambiguous-jamie",
+        proposed_claim="mention im-b7d27d726aae 'Jamie' is ambiguous across p-jamie-a, p-jamie-b",
+    )
+
+    assert first == second

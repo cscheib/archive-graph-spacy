@@ -12,6 +12,8 @@ from archive_graph_spacy.models import Contact, Message
 class SourceBundle:
     contacts: tuple[Contact, ...]
     messages: tuple[Message, ...]
+    reviewed_assertions: tuple[dict[str, object], ...] = ()
+    review_assertion_decisions: tuple[dict[str, object], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -100,10 +102,61 @@ class CandidateDiagnosticsSummary:
     suppressed_counts: dict[str, int]
     example_candidate_ids: tuple[str, ...]
     generated_at: str
+    reviewed_effect_counts: dict[str, int] = field(default_factory=dict)
 
     def to_record(self) -> dict[str, object]:
         payload = asdict(self)
         payload["example_candidate_ids"] = list(self.example_candidate_ids)
+        return payload
+
+
+@dataclass(frozen=True)
+class ReviewedEffectResult:
+    run_id: str
+    candidate_assertion_id: str
+    assertion_type: str
+    subject_canonical_id: str
+    result: str
+    reason_code: str
+    details: str
+
+    def to_record(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class PersonPersonEdgeRecord:
+    pair_id: str
+    person_a_id: str
+    person_b_id: str
+    run_id: str
+    generation_scope: str
+    strength_score: float
+    relationship_signal: str
+    direct_evidence_count: int
+    indirect_evidence_count: int
+    strongest_evidence_ref: str
+    is_current: bool = True
+
+    def to_record(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class PersonPersonEdgeEvidenceRecord:
+    pair_evidence_id: str
+    pair_id: str
+    evidence_family: str
+    source_ref: str
+    contribution_score: float
+    rank_within_pair: int
+    message_ref: str
+    theme_refs: tuple[str, ...] = ()
+    provenance: str = ""
+
+    def to_record(self) -> dict[str, object]:
+        payload = asdict(self)
+        payload["theme_refs"] = list(self.theme_refs)
         return payload
 
 
@@ -164,6 +217,9 @@ class PipelineResult:
     candidate_summary: CandidateDiagnosticsSummary
     theme_tags: tuple[ThemeTag, ...]
     search_docs: tuple[SearchDocument, ...]
+    reviewed_effects: tuple[ReviewedEffectResult, ...] = ()
+    person_person_edges: tuple[PersonPersonEdgeRecord, ...] = ()
+    person_person_edge_evidence: tuple[PersonPersonEdgeEvidenceRecord, ...] = ()
     suppressed_counts: dict[str, int] = field(default_factory=dict)
 
 

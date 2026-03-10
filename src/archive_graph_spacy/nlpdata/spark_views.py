@@ -65,7 +65,41 @@ emitted_candidate_count BIGINT,
 candidate_counts_by_type MAP<STRING, BIGINT>,
 suppressed_counts MAP<STRING, BIGINT>,
 example_candidate_ids ARRAY<STRING>,
-generated_at STRING
+generated_at STRING,
+reviewed_effect_counts MAP<STRING, BIGINT>
+""".strip(),
+    "reviewed_effects": """
+run_id STRING,
+candidate_assertion_id STRING,
+assertion_type STRING,
+subject_canonical_id STRING,
+result STRING,
+reason_code STRING,
+details STRING
+""".strip(),
+    "person_person_edges": """
+pair_id STRING,
+person_a_id STRING,
+person_b_id STRING,
+run_id STRING,
+generation_scope STRING,
+strength_score DOUBLE,
+relationship_signal STRING,
+direct_evidence_count BIGINT,
+indirect_evidence_count BIGINT,
+strongest_evidence_ref STRING,
+is_current BOOLEAN
+""".strip(),
+    "person_person_edge_evidence": """
+pair_evidence_id STRING,
+pair_id STRING,
+evidence_family STRING,
+source_ref STRING,
+contribution_score DOUBLE,
+rank_within_pair INT,
+message_ref STRING,
+theme_refs ARRAY<STRING>,
+provenance STRING
 """.strip(),
     "message_theme_tags": """
 theme_tag_id STRING,

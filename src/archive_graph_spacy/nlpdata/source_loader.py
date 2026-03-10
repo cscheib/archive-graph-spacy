@@ -25,7 +25,26 @@ DEFAULT_INTERACTION_TYPES = (
 
 def load_source_bundle(directory: str | Path) -> SourceBundle:
     contacts, messages = load_export_bundle(directory)
-    return SourceBundle(contacts=tuple(contacts), messages=tuple(messages))
+    base = Path(directory)
+    reviewed_assertions = _read_optional_jsonl(base / "reviewed_assertions.jsonl")
+    review_assertion_decisions = _read_optional_jsonl(base / "review_assertion_decisions.jsonl")
+    return SourceBundle(
+        contacts=tuple(contacts),
+        messages=tuple(messages),
+        reviewed_assertions=tuple(reviewed_assertions),
+        review_assertion_decisions=tuple(review_assertion_decisions),
+    )
+
+
+def _read_optional_jsonl(path: Path) -> list[dict[str, object]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, object]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        rows.append(json.loads(line))
+    return rows
 
 
 def _quote_sql_string(value: str) -> str:
@@ -100,6 +119,8 @@ def _message_from_row(row: dict[str, object]) -> Message:
 def source_bundle_from_rows(
     contacts_rows: list[dict[str, object]],
     message_rows: list[dict[str, object]],
+    reviewed_assertion_rows: list[dict[str, object]] | None = None,
+    review_assertion_decision_rows: list[dict[str, object]] | None = None,
 ) -> SourceBundle:
     contacts = tuple(
         _contact_from_row(row)
@@ -107,7 +128,12 @@ def source_bundle_from_rows(
         if row.get("person_id") and row.get("display_name")
     )
     messages = tuple(_message_from_row(row) for row in message_rows if row.get("message_id"))
-    return SourceBundle(contacts=contacts, messages=messages)
+    return SourceBundle(
+        contacts=contacts,
+        messages=messages,
+        reviewed_assertions=tuple(reviewed_assertion_rows or []),
+        review_assertion_decisions=tuple(review_assertion_decision_rows or []),
+    )
 
 
 def load_source_bundle_from_databricks(
@@ -170,7 +196,49 @@ def load_source_bundle_from_databricks(
         {people_limit_sql}
     """
     contacts_rows = client.fetch_all(contacts_query)
-    return source_bundle_from_rows(contacts_rows, messages_rows)
+    reviewed_assertions_query = f"""
+        SELECT
+            candidate_assertion_id,
+            reviewed_assertion_id,
+            review_decision_id,
+            assertion_type,
+            subject_canonical_id,
+            proposed_claim,
+            current_review_state,
+            promotion_eligibility,
+            promotion_status,
+            evidence_refs,
+            provenance_summary,
+            confidence_level,
+            CAST(updated_at AS STRING) AS updated_at
+        FROM {quoted_catalog}.memory.reviewed_assertions
+    """
+    review_assertion_decisions_query = f"""
+        SELECT
+            candidate_assertion_id,
+            review_decision_id,
+            decision_state,
+            reviewer_actor,
+            decision_reason,
+            CAST(decision_timestamp AS STRING) AS decision_timestamp,
+            evidence_snapshot,
+            promotion_intent
+        FROM {quoted_catalog}.memory.review_assertion_decisions
+    """
+    try:
+        reviewed_assertion_rows = client.fetch_all(reviewed_assertions_query)
+    except Exception:
+        reviewed_assertion_rows = []
+    try:
+        review_assertion_decision_rows = client.fetch_all(review_assertion_decisions_query)
+    except Exception:
+        review_assertion_decision_rows = []
+    return source_bundle_from_rows(
+        contacts_rows,
+        messages_rows,
+        reviewed_assertion_rows=reviewed_assertion_rows,
+        review_assertion_decision_rows=review_assertion_decision_rows,
+    )
 
 
 def contact_index(contacts: tuple[Contact, ...]) -> dict[str, Contact]:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -9,6 +11,7 @@ from .models import BoundedPublishScope, PublishDiagnosticsRecord, RefreshRun
 
 RUNTIME_TARGET_INTERACTIONS = 10_000
 RUNTIME_TARGET_SECONDS = 15 * 60
+MENTION_ID_TOKEN = re.compile(r"\b(?:mm|im)-[0-9a-f]{6,16}\b", re.IGNORECASE)
 
 
 def new_run_id() -> str:
@@ -93,3 +96,17 @@ def build_publish_diagnostics(
         failed_tables=failed_tables,
         manual_intervention_required=manual_intervention_required,
     )
+
+
+def semantic_replay_key(
+    *,
+    assertion_type: str,
+    subject_canonical_id: str,
+    proposed_claim: str,
+) -> str:
+    normalized_claim = " ".join(proposed_claim.strip().split()).casefold()
+    normalized_claim = MENTION_ID_TOKEN.sub("<mention>", normalized_claim)
+    digest = hashlib.sha1(
+        f"{assertion_type}|{subject_canonical_id}|{normalized_claim}".encode("utf-8")
+    ).hexdigest()[:16]
+    return f"srk-{digest}"

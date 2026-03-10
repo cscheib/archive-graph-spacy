@@ -16,6 +16,10 @@ class FakeSqlClient:
             return self.rows["messages"]
         if "FROM `personal_archive_dev`.gold.persons" in statement:
             return self.rows["contacts"]
+        if "FROM `personal_archive_dev`.memory.reviewed_assertions" in statement:
+            return self.rows.get("reviewed_assertions", [])
+        if "FROM `personal_archive_dev`.memory.review_assertion_decisions" in statement:
+            return self.rows.get("review_assertion_decisions", [])
         raise AssertionError(f"Unexpected query: {statement}")
 
 
@@ -43,6 +47,21 @@ def test_load_source_bundle_from_databricks_maps_rows(monkeypatch) -> None:
                 "interaction_type": "email",
             }
         ],
+        "reviewed_assertions": [
+            {
+                "candidate_assertion_id": "legacy-relay-bob",
+                "assertion_type": "relay_sender_identity",
+                "subject_canonical_id": "m-relay-bob",
+                "proposed_claim": "relay sender relay+bob@relay.example.com maps to p-bob",
+                "current_review_state": "accepted",
+            }
+        ],
+        "review_assertion_decisions": [
+            {
+                "candidate_assertion_id": "legacy-relay-bob",
+                "decision_state": "accepted",
+            }
+        ],
     }
     fake_client = FakeSqlClient(rows)
     monkeypatch.setattr(
@@ -67,6 +86,8 @@ def test_load_source_bundle_from_databricks_maps_rows(monkeypatch) -> None:
     assert bundle.contacts[0].person_id == "p-alice"
     assert bundle.messages[0].message_id == "m-001"
     assert bundle.messages[0].recipients == ("bob@example.com",)
+    assert bundle.reviewed_assertions[0]["candidate_assertion_id"] == "legacy-relay-bob"
+    assert bundle.review_assertion_decisions[0]["decision_state"] == "accepted"
     assert any("LIMIT 100" in query for query in fake_client.queries)
     assert any("LIMIT 200" in query for query in fake_client.queries)
 

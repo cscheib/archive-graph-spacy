@@ -25,6 +25,14 @@ The next roadmap issues depend on resolving that gap:
 - `archive-graph-spacy#12` Add selective embeddings and LLM-assisted aggregate
   enrichment
 
+Phase 3 now provides the prerequisite feedback and relationship surfaces this
+ADR depends on:
+
+- reviewed outcomes are consumed read-only during `build_nlpdata`
+- `reviewed_effects` capture replay diagnostics for reruns
+- `person_person_edges` publish one canonical summary row per pair
+- `person_person_edge_evidence` publish bounded supporting pair evidence
+
 Without an explicit `Phase` decision, the repo boundary remains blurry:
 
 - `archive-graph-spacy` could under-publish and force the UI to invent graph

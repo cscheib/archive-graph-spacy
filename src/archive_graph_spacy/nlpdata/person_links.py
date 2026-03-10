@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import re
 from collections import defaultdict
 from datetime import timezone, datetime
 from dataclasses import dataclass
@@ -12,11 +14,20 @@ from archive_graph_spacy.link.person import link_mentions_to_people
 from archive_graph_spacy.models import Contact, LinkCandidate, Mention, Message
 
 from .mentions import extract_message_mentions
-from .models import CandidateAssertion, CandidateDiagnosticsSummary, InteractionMention, PersonMessageLink
+from .models import (
+    CandidateAssertion,
+    CandidateDiagnosticsSummary,
+    InteractionMention,
+    PersonMessageLink,
+    ReviewedEffectResult,
+)
+from .runs import semantic_replay_key
 from .source_loader import contact_email_index, effective_person_contacts
 
 MIN_PERSON_LINK_CONFIDENCE = 0.5
 MIN_RELAY_CANDIDATE_CONFIDENCE = 0.75
+RELATIONSHIP_REVIEW_MIN_SCORE = 0.75
+PAIR_CLAIM_MESSAGE = re.compile(r"pair\s+([a-z0-9-]+)\s+", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -179,6 +190,44 @@ def _disambiguation_candidate(
     )
 
 
+def _relationship_evidence_candidate(
+    *,
+    run_id: str,
+    generation_scope: str,
+    person_a_id: str,
+    person_b_id: str,
+    direct_count: int,
+    indirect_count: int,
+    evidence_refs: tuple[str, ...],
+) -> CandidateAssertion:
+    pair_id = "|".join(sorted((person_a_id, person_b_id)))
+    proposed_claim = (
+        f"pair {pair_id} has conflicting relationship evidence "
+        f"(direct={direct_count}, indirect={indirect_count})"
+    )
+    return CandidateAssertion(
+        candidate_assertion_id=_candidate_id(
+            "relationship_evidence_review",
+            pair_id,
+            proposed_claim,
+            generation_scope,
+        ),
+        run_id=run_id,
+        assertion_type="relationship_evidence_review",
+        subject_canonical_id=pair_id,
+        proposed_claim=proposed_claim,
+        evidence_refs=evidence_refs,
+        provenance_summary=(
+            "Derived from mixed direct and indirect pair evidence across the bounded run"
+        ),
+        confidence_level=RELATIONSHIP_REVIEW_MIN_SCORE,
+        generation_scope=generation_scope,
+        generated_at=_generated_at(),
+        review_class="reviewable",
+        promotion_class="derived_only",
+    )
+
+
 def _is_reviewable_disambiguation(
     mention: InteractionMention,
     candidates: Sequence[LinkCandidate],
@@ -199,10 +248,14 @@ def _candidate_summary(
     generation_scope: str,
     candidates: tuple[CandidateAssertion, ...],
     suppressed: dict[str, int],
+    reviewed_effects: tuple[ReviewedEffectResult, ...] = (),
 ) -> CandidateDiagnosticsSummary:
     counts: dict[str, int] = defaultdict(int)
     for candidate in candidates:
         counts[candidate.assertion_type] += 1
+    reviewed_counts: dict[str, int] = defaultdict(int)
+    for effect in reviewed_effects:
+        reviewed_counts[effect.result] += 1
     return CandidateDiagnosticsSummary(
         run_id=run_id,
         generation_scope=generation_scope,
@@ -211,6 +264,7 @@ def _candidate_summary(
         suppressed_counts=dict(suppressed),
         example_candidate_ids=tuple(candidate.candidate_assertion_id for candidate in candidates[:5]),
         generated_at=_generated_at(),
+        reviewed_effect_counts=dict(reviewed_counts),
     )
 
 
@@ -289,12 +343,277 @@ def derive_candidate_assertions(
             )
             candidates_by_id[candidate.candidate_assertion_id] = candidate
 
+    pair_evidence: dict[tuple[str, str], dict[str, object]] = {}
+    for context in contexts:
+        direct_participants = set(context.explicit_participants)
+        for idx, left in enumerate(sorted(direct_participants)):
+            for right in sorted(direct_participants)[idx + 1 :]:
+                pair_key = tuple(sorted((left, right)))
+                record = pair_evidence.setdefault(
+                    pair_key,
+                    {"direct": set(), "indirect": set()},
+                )
+                record["direct"].add(context.message.message_id)
+        for mention in context.extracted_mentions:
+            linked_candidates = context.linked_candidates.get(mention.span_text, [])
+            if not linked_candidates:
+                continue
+            best = linked_candidates[0]
+            if best.score < MIN_PERSON_LINK_CONFIDENCE:
+                continue
+            for explicit_person_id in context.explicit_participants:
+                if explicit_person_id == best.person_id:
+                    continue
+                pair_key = tuple(sorted((explicit_person_id, best.person_id)))
+                record = pair_evidence.setdefault(
+                    pair_key,
+                    {"direct": set(), "indirect": set()},
+                )
+                record["indirect"].add(context.message.message_id)
+
+    for (person_a_id, person_b_id), evidence in pair_evidence.items():
+        direct_messages = tuple(sorted(evidence["direct"]))
+        indirect_messages = tuple(sorted(evidence["indirect"]))
+        if not direct_messages or not indirect_messages:
+            continue
+        evidence_refs = tuple(
+            [f"pair:{person_a_id}|{person_b_id}"]
+            + [f"direct_message:{message_id}" for message_id in direct_messages[:3]]
+            + [f"indirect_message:{message_id}" for message_id in indirect_messages[:3]]
+        )
+        candidate = _relationship_evidence_candidate(
+            run_id=run_id,
+            generation_scope=generation_scope,
+            person_a_id=person_a_id,
+            person_b_id=person_b_id,
+            direct_count=len(direct_messages),
+            indirect_count=len(indirect_messages),
+            evidence_refs=evidence_refs,
+        )
+        candidates_by_id[candidate.candidate_assertion_id] = candidate
+
     candidates = tuple(candidates_by_id.values())
     return candidates, _candidate_summary(
         run_id=run_id,
         generation_scope=generation_scope,
         candidates=candidates,
         suppressed=dict(suppressed),
+    )
+
+
+def _normalized_reviewed_inputs(
+    reviewed_assertions: tuple[dict[str, object], ...],
+    review_assertion_decisions: tuple[dict[str, object], ...],
+) -> list[dict[str, object]]:
+    by_candidate: dict[str, dict[str, object]] = {}
+    for row in reviewed_assertions:
+        candidate_id = str(row.get("candidate_assertion_id") or "")
+        if not candidate_id:
+            continue
+        by_candidate[candidate_id] = {
+            "candidate_assertion_id": candidate_id,
+            "assertion_type": str(row.get("assertion_type") or ""),
+            "subject_canonical_id": str(row.get("subject_canonical_id") or ""),
+            "proposed_claim": str(row.get("proposed_claim") or ""),
+            "review_state": str(row.get("current_review_state") or ""),
+            "evidence_refs": tuple(str(item) for item in row.get("evidence_refs") or ()),
+        }
+    for row in review_assertion_decisions:
+        candidate_id = str(row.get("candidate_assertion_id") or "")
+        if not candidate_id:
+            continue
+        if candidate_id in by_candidate:
+            by_candidate[candidate_id]["decision_state"] = str(row.get("decision_state") or "")
+            continue
+        snapshot = row.get("evidence_snapshot")
+        parsed: dict[str, object] = {}
+        if isinstance(snapshot, str) and snapshot.strip():
+            try:
+                maybe = json.loads(snapshot)
+            except json.JSONDecodeError:
+                maybe = {}
+            if isinstance(maybe, dict):
+                parsed = maybe
+        by_candidate[candidate_id] = {
+            "candidate_assertion_id": candidate_id,
+            "assertion_type": str(parsed.get("assertion_type") or ""),
+            "subject_canonical_id": str(parsed.get("subject_canonical_id") or ""),
+            "proposed_claim": str(parsed.get("proposed_claim") or ""),
+            "review_state": str(row.get("decision_state") or ""),
+            "evidence_refs": (),
+        }
+    return list(by_candidate.values())
+
+
+def _semantic_key_from_values(assertion_type: str, subject_canonical_id: str, proposed_claim: str) -> str:
+    return semantic_replay_key(
+        assertion_type=assertion_type,
+        subject_canonical_id=subject_canonical_id,
+        proposed_claim=proposed_claim,
+    )
+
+
+def _candidate_semantic_key(candidate: CandidateAssertion) -> str:
+    return _semantic_key_from_values(
+        candidate.assertion_type,
+        candidate.subject_canonical_id,
+        candidate.proposed_claim,
+    )
+
+
+def _reviewed_semantic_key(reviewed: dict[str, object]) -> str:
+    return _semantic_key_from_values(
+        str(reviewed.get("assertion_type") or ""),
+        str(reviewed.get("subject_canonical_id") or ""),
+        str(reviewed.get("proposed_claim") or ""),
+    )
+
+
+def _reviewed_relay_link(
+    *,
+    reviewed: dict[str, object],
+    run_id: str,
+    contacts: tuple[Contact, ...],
+) -> PersonMessageLink | None:
+    proposed_claim = str(reviewed.get("proposed_claim") or "")
+    if " maps to " not in proposed_claim:
+        return None
+    person_id = proposed_claim.rsplit(" maps to ", 1)[-1].strip()
+    contact_lookup = {contact.person_id: contact for contact in effective_person_contacts(contacts)}
+    contact = contact_lookup.get(person_id)
+    if contact is None:
+        return None
+    message_id = str(reviewed.get("subject_canonical_id") or "")
+    sender = proposed_claim.split("relay sender ", 1)[-1].split(" maps to ", 1)[0].strip()
+    return PersonMessageLink(
+        link_id=_link_id(message_id, person_id, "sender", "reviewed"),
+        run_id=run_id,
+        message_id=message_id,
+        person_id=person_id,
+        person_name=contact.display_name,
+        role="sender",
+        link_origin="reviewed",
+        confidence=1.0,
+        evidence_type="reviewed_assertion",
+        evidence_value=sender,
+        source_interaction_id=message_id,
+    )
+
+
+def _reviewed_relationship_pair_id(reviewed: dict[str, object]) -> str | None:
+    subject = str(reviewed.get("subject_canonical_id") or "")
+    if "|" in subject:
+        return subject
+    proposed_claim = str(reviewed.get("proposed_claim") or "")
+    match = PAIR_CLAIM_MESSAGE.search(proposed_claim)
+    if not match:
+        return None
+    return match.group(1).strip() or None
+
+
+def apply_reviewed_feedback(
+    *,
+    run_id: str,
+    contacts: tuple[Contact, ...],
+    candidate_assertions: tuple[CandidateAssertion, ...],
+    reviewed_assertions: tuple[dict[str, object], ...],
+    review_assertion_decisions: tuple[dict[str, object], ...],
+) -> tuple[tuple[CandidateAssertion, ...], tuple[ReviewedEffectResult, ...], tuple[PersonMessageLink, ...]]:
+    reviewed_inputs = _normalized_reviewed_inputs(reviewed_assertions, review_assertion_decisions)
+    by_candidate_id = {candidate.candidate_assertion_id: candidate for candidate in candidate_assertions}
+    by_semantic_key = {_candidate_semantic_key(candidate): candidate for candidate in candidate_assertions}
+    by_subject_family: dict[tuple[str, str], list[CandidateAssertion]] = defaultdict(list)
+    for candidate in candidate_assertions:
+        by_subject_family[(candidate.assertion_type, candidate.subject_canonical_id)].append(candidate)
+
+    remaining: dict[str, CandidateAssertion] = dict(by_candidate_id)
+    reviewed_effects: list[ReviewedEffectResult] = []
+    extra_links: dict[tuple[str, str, str], PersonMessageLink] = {}
+
+    for reviewed in reviewed_inputs:
+        candidate_id = str(reviewed.get("candidate_assertion_id") or "")
+        assertion_type = str(reviewed.get("assertion_type") or "")
+        subject_canonical_id = str(reviewed.get("subject_canonical_id") or "")
+        review_state = str(reviewed.get("decision_state") or reviewed.get("review_state") or "")
+        matched = by_candidate_id.get(candidate_id)
+        if matched is None:
+            matched = by_semantic_key.get(_reviewed_semantic_key(reviewed))
+        if matched is None:
+            possible_conflicts = by_subject_family.get((assertion_type, subject_canonical_id), [])
+            if possible_conflicts and review_state == "accepted":
+                reviewed_effects.append(
+                    ReviewedEffectResult(
+                        run_id=run_id,
+                        candidate_assertion_id=candidate_id,
+                        assertion_type=assertion_type,
+                        subject_canonical_id=subject_canonical_id,
+                        result="conflicted",
+                        reason_code="semantic_mismatch",
+                        details="accepted reviewed outcome no longer matches regenerated claim",
+                    )
+                )
+            else:
+                reviewed_effects.append(
+                    ReviewedEffectResult(
+                        run_id=run_id,
+                        candidate_assertion_id=candidate_id,
+                        assertion_type=assertion_type,
+                        subject_canonical_id=subject_canonical_id,
+                        result="ignored",
+                        reason_code="no_replay_match",
+                        details="reviewed input did not match any regenerated candidate",
+                    )
+                )
+            continue
+
+        remaining.pop(matched.candidate_assertion_id, None)
+        if review_state == "accepted":
+            link = None
+            if matched.assertion_type == "relay_sender_identity":
+                link = _reviewed_relay_link(reviewed=reviewed, run_id=run_id, contacts=contacts)
+            if link is not None:
+                extra_links[(link.message_id, link.person_id, link.role)] = link
+            reviewed_effects.append(
+                ReviewedEffectResult(
+                    run_id=run_id,
+                    candidate_assertion_id=matched.candidate_assertion_id,
+                    assertion_type=matched.assertion_type,
+                    subject_canonical_id=matched.subject_canonical_id,
+                    result="applied",
+                    reason_code="accepted_review",
+                    details="accepted reviewed input applied downstream effect and suppressed candidate re-emission",
+                )
+            )
+        elif review_state in {"rejected", "superseded"}:
+            reviewed_effects.append(
+                ReviewedEffectResult(
+                    run_id=run_id,
+                    candidate_assertion_id=matched.candidate_assertion_id,
+                    assertion_type=matched.assertion_type,
+                    subject_canonical_id=matched.subject_canonical_id,
+                    result="suppressed",
+                    reason_code=review_state,
+                    details="reviewed decision suppressed candidate re-emission",
+                )
+            )
+        else:
+            remaining[matched.candidate_assertion_id] = matched
+            reviewed_effects.append(
+                ReviewedEffectResult(
+                    run_id=run_id,
+                    candidate_assertion_id=matched.candidate_assertion_id,
+                    assertion_type=matched.assertion_type,
+                    subject_canonical_id=matched.subject_canonical_id,
+                    result="skipped",
+                    reason_code="non_terminal_review_state",
+                    details="reviewed input is not in an applied or suppressed state",
+                )
+            )
+
+    return (
+        tuple(remaining.values()),
+        tuple(reviewed_effects),
+        tuple(extra_links.values()),
     )
 
 

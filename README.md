@@ -55,6 +55,8 @@ First-wave candidate generation now runs inside the local `nlpdata` pipeline:
   supporting inferred person-link signal
 - `person_link_disambiguation` emits only for multi-candidate, no-clear-winner
   first-name ambiguity cases
+- `relationship_evidence_review` emits for pairwise cases with mixed direct and
+  indirect relationship evidence
 - outputs remain pre-review and non-canonical
 
 The candidate output contract is published here:
@@ -66,9 +68,21 @@ Running `build_nlpdata` against a bundle now also writes:
 
 ```text
 data_exports/<bundle>/derived/nlpdata/
+├── reviewed_effects.jsonl
+├── person_person_edges.jsonl
+├── person_person_edge_evidence.jsonl
 ├── candidate_assertions.jsonl
 └── candidate_assertions_summary.json
 ```
+
+Accepted and rejected reviewed outcomes from `graph-data` can now be loaded
+read-only during `build_nlpdata` reruns through:
+
+- `reviewed_assertions.jsonl`
+- `review_assertion_decisions.jsonl`
+
+for local bundle validation, or from `memory.reviewed_assertions` and
+`memory.review_assertion_decisions` when sourcing directly from Databricks.
 
 ## Publish Hardening
 
@@ -180,6 +194,9 @@ This writes:
 
 ```text
 data_exports/<bundle>/derived/nlpdata/
+├── reviewed_effects.jsonl
+├── person_person_edges.jsonl
+├── person_person_edge_evidence.jsonl
 ├── candidate_assertions.jsonl
 ├── candidate_assertions_summary.json
 ├── nlp_runs.jsonl
