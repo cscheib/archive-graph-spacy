@@ -32,11 +32,17 @@ def load_source_bundle(directory: str | Path) -> SourceBundle:
     base = Path(directory)
     reviewed_assertions = _read_optional_jsonl(base / "reviewed_assertions.jsonl")
     review_assertion_decisions = _read_optional_jsonl(base / "review_assertion_decisions.jsonl")
+    existing_person_person_edges = _read_optional_jsonl(base / "derived" / "nlpdata" / "person_person_edges.jsonl")
+    existing_person_person_edge_evidence = _read_optional_jsonl(
+        base / "derived" / "nlpdata" / "person_person_edge_evidence.jsonl"
+    )
     return SourceBundle(
         contacts=tuple(contacts),
         messages=tuple(messages),
         reviewed_assertions=tuple(reviewed_assertions),
         review_assertion_decisions=tuple(review_assertion_decisions),
+        existing_person_person_edges=tuple(existing_person_person_edges),
+        existing_person_person_edge_evidence=tuple(existing_person_person_edge_evidence),
     )
 
 
@@ -130,6 +136,8 @@ def source_bundle_from_rows(
     message_rows: list[dict[str, object]],
     reviewed_assertion_rows: list[dict[str, object]] | None = None,
     review_assertion_decision_rows: list[dict[str, object]] | None = None,
+    existing_person_person_edge_rows: list[dict[str, object]] | None = None,
+    existing_person_person_edge_evidence_rows: list[dict[str, object]] | None = None,
 ) -> SourceBundle:
     contacts = tuple(
         _contact_from_row(row)
@@ -142,6 +150,8 @@ def source_bundle_from_rows(
         messages=messages,
         reviewed_assertions=tuple(reviewed_assertion_rows or []),
         review_assertion_decisions=tuple(review_assertion_decision_rows or []),
+        existing_person_person_edges=tuple(existing_person_person_edge_rows or []),
+        existing_person_person_edge_evidence=tuple(existing_person_person_edge_evidence_rows or []),
     )
 
 

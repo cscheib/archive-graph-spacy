@@ -23,6 +23,12 @@ DEFAULT_SCHEMA = "nlpdata"
 CURRENT_STATE_TABLES = {
     "message_person_links",
     "person_person_edges",
+    "phases",
+    "phase_central_people",
+    "phase_theme_summaries",
+    "phase_pair_summaries",
+    "phase_pair_evidence",
+    "phase_representative_interactions",
     "message_theme_tags",
     "message_search_docs",
 }
@@ -30,6 +36,12 @@ CURRENT_STATE_TABLES = {
 CURRENT_STATE_IDENTITY_COLUMNS = {
     "message_person_links": "message_id",
     "person_person_edges": "pair_id",
+    "phases": "phase_id",
+    "phase_central_people": "phase_id",
+    "phase_theme_summaries": "phase_id",
+    "phase_pair_summaries": "phase_pair_id",
+    "phase_pair_evidence": "phase_pair_id",
+    "phase_representative_interactions": "phase_id",
     "message_theme_tags": "message_id",
     "message_search_docs": "message_id",
 }
@@ -116,6 +128,93 @@ CREATE TABLE IF NOT EXISTS {catalog}.{schema}.person_person_edge_evidence (
   message_ref STRING,
   theme_refs ARRAY<STRING>,
   provenance STRING
+) USING DELTA
+""".strip(),
+    "phases": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.phases (
+  phase_id STRING,
+  run_id STRING,
+  generation_scope STRING,
+  phase_index INT,
+  start_at TIMESTAMP,
+  end_at TIMESTAMP,
+  interaction_count BIGINT,
+  representative_interaction_ref STRING,
+  boundary_reason STRING,
+  is_current BOOLEAN
+) USING DELTA
+""".strip(),
+    "phase_central_people": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.phase_central_people (
+  phase_id STRING,
+  run_id STRING,
+  person_id STRING,
+  rank INT,
+  centrality_score DOUBLE,
+  interaction_count BIGINT,
+  evidence_ref STRING,
+  is_current BOOLEAN
+) USING DELTA
+""".strip(),
+    "phase_theme_summaries": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.phase_theme_summaries (
+  phase_id STRING,
+  run_id STRING,
+  theme STRING,
+  rank INT,
+  theme_score DOUBLE,
+  message_count BIGINT,
+  evidence_ref STRING,
+  is_current BOOLEAN
+) USING DELTA
+""".strip(),
+    "phase_pair_summaries": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.phase_pair_summaries (
+  phase_pair_id STRING,
+  phase_id STRING,
+  pair_id STRING,
+  run_id STRING,
+  pair_rank INT,
+  activity_score DOUBLE,
+  relationship_signal STRING,
+  evidence_count BIGINT,
+  strongest_evidence_ref STRING,
+  is_current BOOLEAN
+) USING DELTA
+""".strip(),
+    "phase_pair_evidence": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.phase_pair_evidence (
+  phase_pair_evidence_id STRING,
+  phase_pair_id STRING,
+  phase_id STRING,
+  pair_id STRING,
+  source_ref STRING,
+  message_ref STRING,
+  evidence_family STRING,
+  rank_within_phase_pair INT,
+  contribution_score DOUBLE,
+  is_current BOOLEAN
+) USING DELTA
+""".strip(),
+    "phase_representative_interactions": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.phase_representative_interactions (
+  phase_id STRING,
+  run_id STRING,
+  interaction_ref STRING,
+  rank INT,
+  selection_reason STRING,
+  is_current BOOLEAN
+) USING DELTA
+""".strip(),
+    "phase_diagnostics": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.phase_diagnostics (
+  run_id STRING,
+  phase_id STRING,
+  diagnostic_type STRING,
+  result STRING,
+  reason_code STRING,
+  sample_ref STRING,
+  details STRING
 ) USING DELTA
 """.strip(),
     "message_theme_tags": """
@@ -222,6 +321,79 @@ TABLE_COLUMN_TYPES: dict[str, dict[str, str]] = {
         "message_ref": "STRING",
         "theme_refs": "ARRAY<STRING>",
         "provenance": "STRING",
+    },
+    "phases": {
+        "phase_id": "STRING",
+        "run_id": "STRING",
+        "generation_scope": "STRING",
+        "phase_index": "INT",
+        "start_at": "TIMESTAMP",
+        "end_at": "TIMESTAMP",
+        "interaction_count": "BIGINT",
+        "representative_interaction_ref": "STRING",
+        "boundary_reason": "STRING",
+        "is_current": "BOOLEAN",
+    },
+    "phase_central_people": {
+        "phase_id": "STRING",
+        "run_id": "STRING",
+        "person_id": "STRING",
+        "rank": "INT",
+        "centrality_score": "DOUBLE",
+        "interaction_count": "BIGINT",
+        "evidence_ref": "STRING",
+        "is_current": "BOOLEAN",
+    },
+    "phase_theme_summaries": {
+        "phase_id": "STRING",
+        "run_id": "STRING",
+        "theme": "STRING",
+        "rank": "INT",
+        "theme_score": "DOUBLE",
+        "message_count": "BIGINT",
+        "evidence_ref": "STRING",
+        "is_current": "BOOLEAN",
+    },
+    "phase_pair_summaries": {
+        "phase_pair_id": "STRING",
+        "phase_id": "STRING",
+        "pair_id": "STRING",
+        "run_id": "STRING",
+        "pair_rank": "INT",
+        "activity_score": "DOUBLE",
+        "relationship_signal": "STRING",
+        "evidence_count": "BIGINT",
+        "strongest_evidence_ref": "STRING",
+        "is_current": "BOOLEAN",
+    },
+    "phase_pair_evidence": {
+        "phase_pair_evidence_id": "STRING",
+        "phase_pair_id": "STRING",
+        "phase_id": "STRING",
+        "pair_id": "STRING",
+        "source_ref": "STRING",
+        "message_ref": "STRING",
+        "evidence_family": "STRING",
+        "rank_within_phase_pair": "INT",
+        "contribution_score": "DOUBLE",
+        "is_current": "BOOLEAN",
+    },
+    "phase_representative_interactions": {
+        "phase_id": "STRING",
+        "run_id": "STRING",
+        "interaction_ref": "STRING",
+        "rank": "INT",
+        "selection_reason": "STRING",
+        "is_current": "BOOLEAN",
+    },
+    "phase_diagnostics": {
+        "run_id": "STRING",
+        "phase_id": "STRING",
+        "diagnostic_type": "STRING",
+        "result": "STRING",
+        "reason_code": "STRING",
+        "sample_ref": "STRING",
+        "details": "STRING",
     },
     "message_theme_tags": {
         "theme_tag_id": "STRING",
@@ -340,6 +512,100 @@ SELECT
   message_ref,
   from_json(to_json(theme_refs), 'array<string>'),
   provenance
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
+    "phases": """
+INSERT INTO {catalog}.{schema}.phases
+SELECT
+  phase_id,
+  run_id,
+  generation_scope,
+  CAST(phase_index AS INT),
+  CAST(start_at AS TIMESTAMP),
+  CAST(end_at AS TIMESTAMP),
+  CAST(interaction_count AS BIGINT),
+  representative_interaction_ref,
+  boundary_reason,
+  CAST(is_current AS BOOLEAN)
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
+    "phase_central_people": """
+INSERT INTO {catalog}.{schema}.phase_central_people
+SELECT
+  phase_id,
+  run_id,
+  person_id,
+  CAST(rank AS INT),
+  CAST(centrality_score AS DOUBLE),
+  CAST(interaction_count AS BIGINT),
+  evidence_ref,
+  CAST(is_current AS BOOLEAN)
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
+    "phase_theme_summaries": """
+INSERT INTO {catalog}.{schema}.phase_theme_summaries
+SELECT
+  phase_id,
+  run_id,
+  theme,
+  CAST(rank AS INT),
+  CAST(theme_score AS DOUBLE),
+  CAST(message_count AS BIGINT),
+  evidence_ref,
+  CAST(is_current AS BOOLEAN)
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
+    "phase_pair_summaries": """
+INSERT INTO {catalog}.{schema}.phase_pair_summaries
+SELECT
+  phase_pair_id,
+  phase_id,
+  pair_id,
+  run_id,
+  CAST(pair_rank AS INT),
+  CAST(activity_score AS DOUBLE),
+  relationship_signal,
+  CAST(evidence_count AS BIGINT),
+  strongest_evidence_ref,
+  CAST(is_current AS BOOLEAN)
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
+    "phase_pair_evidence": """
+INSERT INTO {catalog}.{schema}.phase_pair_evidence
+SELECT
+  phase_pair_evidence_id,
+  phase_pair_id,
+  phase_id,
+  pair_id,
+  source_ref,
+  message_ref,
+  evidence_family,
+  CAST(rank_within_phase_pair AS INT),
+  CAST(contribution_score AS DOUBLE),
+  CAST(is_current AS BOOLEAN)
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
+    "phase_representative_interactions": """
+INSERT INTO {catalog}.{schema}.phase_representative_interactions
+SELECT
+  phase_id,
+  run_id,
+  interaction_ref,
+  CAST(rank AS INT),
+  selection_reason,
+  CAST(is_current AS BOOLEAN)
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
+    "phase_diagnostics": """
+INSERT INTO {catalog}.{schema}.phase_diagnostics
+SELECT
+  run_id,
+  phase_id,
+  diagnostic_type,
+  result,
+  reason_code,
+  sample_ref,
+  details
 FROM read_files({remote_path}, format => 'json')
 """.strip(),
     "message_theme_tags": """

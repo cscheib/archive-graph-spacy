@@ -125,6 +125,121 @@ def _write_payload_fixture(tmp_path: Path, run_id: str = "run-123") -> None:
         + "\n",
         encoding="utf-8",
     )
+    (tmp_path / "phases.jsonl").write_text(
+        json.dumps(
+            {
+                "phase_id": "phase-001",
+                "run_id": run_id,
+                "generation_scope": "sample-scope",
+                "phase_index": 1,
+                "start_at": "2026-03-08T00:00:00+00:00",
+                "end_at": "2026-03-08T00:01:00+00:00",
+                "interaction_count": 1,
+                "representative_interaction_ref": "message:m-001",
+                "boundary_reason": "time_gap_segmentation",
+                "is_current": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "phase_central_people.jsonl").write_text(
+        json.dumps(
+            {
+                "phase_id": "phase-001",
+                "run_id": run_id,
+                "person_id": "p-001",
+                "rank": 1,
+                "centrality_score": 2.0,
+                "interaction_count": 1,
+                "evidence_ref": "message:m-001",
+                "is_current": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "phase_theme_summaries.jsonl").write_text(
+        json.dumps(
+            {
+                "phase_id": "phase-001",
+                "run_id": run_id,
+                "theme": "travel",
+                "rank": 1,
+                "theme_score": 0.8,
+                "message_count": 1,
+                "evidence_ref": "message:m-001",
+                "is_current": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "phase_pair_summaries.jsonl").write_text(
+        json.dumps(
+            {
+                "phase_pair_id": "phase-pair-001",
+                "phase_id": "phase-001",
+                "pair_id": "pair-001",
+                "run_id": run_id,
+                "pair_rank": 1,
+                "activity_score": 1.0,
+                "relationship_signal": "direct_participation",
+                "evidence_count": 1,
+                "strongest_evidence_ref": "message:m-001",
+                "is_current": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "phase_pair_evidence.jsonl").write_text(
+        json.dumps(
+            {
+                "phase_pair_evidence_id": "phase-ppe-001",
+                "phase_pair_id": "phase-pair-001",
+                "phase_id": "phase-001",
+                "pair_id": "pair-001",
+                "source_ref": "message:m-001",
+                "message_ref": "m-001",
+                "evidence_family": "direct_participation",
+                "rank_within_phase_pair": 1,
+                "contribution_score": 1.0,
+                "is_current": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "phase_representative_interactions.jsonl").write_text(
+        json.dumps(
+            {
+                "phase_id": "phase-001",
+                "run_id": run_id,
+                "interaction_ref": "message:m-001",
+                "rank": 1,
+                "selection_reason": "top_phase_activity",
+                "is_current": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "phase_diagnostics.jsonl").write_text(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "phase_id": "phase-001",
+                "diagnostic_type": "boundary",
+                "result": "retained",
+                "reason_code": "gap_retained",
+                "sample_ref": "message:m-001",
+                "details": "retained boundary after 45 day gap",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     (tmp_path / "message_theme_tags.jsonl").write_text(
         json.dumps(
             {
@@ -230,8 +345,12 @@ def test_deploy_staged_payload_creates_schema_and_merges_current_tables(monkeypa
     assert any("CREATE SCHEMA IF NOT EXISTS `personal_archive_dev`.`nlpdata`" in stmt for stmt in sql_client.statements)
     assert any("CREATE TABLE IF NOT EXISTS `personal_archive_dev`.`nlpdata`.message_search_docs" in stmt for stmt in sql_client.statements)
     assert any("CREATE TABLE IF NOT EXISTS `personal_archive_dev`.`nlpdata`.person_person_edges" in stmt for stmt in sql_client.statements)
+    assert any("CREATE TABLE IF NOT EXISTS `personal_archive_dev`.`nlpdata`.phases" in stmt for stmt in sql_client.statements)
+    assert any("CREATE TABLE IF NOT EXISTS `personal_archive_dev`.`nlpdata`.phase_pair_summaries" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`message_person_links`" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`person_person_edges`" in stmt for stmt in sql_client.statements)
+    assert any("UPDATE `personal_archive_dev`.`nlpdata`.`phases`" in stmt for stmt in sql_client.statements)
+    assert any("UPDATE `personal_archive_dev`.`nlpdata`.`phase_pair_summaries`" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`message_theme_tags`" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`message_search_docs`" in stmt for stmt in sql_client.statements)
     assert any("INSERT INTO `personal_archive_dev`.`nlpdata`.nlp_runs" in stmt for stmt in sql_client.statements)

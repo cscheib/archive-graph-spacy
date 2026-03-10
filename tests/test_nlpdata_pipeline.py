@@ -42,6 +42,13 @@ def test_build_pipeline_payload_includes_all_contract_tables() -> None:
         "reviewed_effects",
         "person_person_edges",
         "person_person_edge_evidence",
+        "phases",
+        "phase_central_people",
+        "phase_theme_summaries",
+        "phase_pair_summaries",
+        "phase_pair_evidence",
+        "phase_representative_interactions",
+        "phase_diagnostics",
         "message_theme_tags",
         "message_search_docs",
     }

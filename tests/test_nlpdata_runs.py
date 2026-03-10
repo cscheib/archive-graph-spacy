@@ -1,6 +1,6 @@
 import json
 
-from archive_graph_spacy.nlpdata.runs import classify_scope_overlap
+from archive_graph_spacy.nlpdata.runs import build_phase_quality_metrics, classify_scope_overlap
 from archive_graph_spacy.scripts.build_nlpdata import build_nlpdata
 
 
@@ -32,3 +32,25 @@ def test_classify_scope_overlap_distinguishes_same_overlap_and_independent() -> 
     assert classify_scope_overlap(("m-001",), (("m-001",),)) == "same_scope_rerun"
     assert classify_scope_overlap(("m-001", "m-002"), (("m-002", "m-003"),)) == "overlapping_scope"
     assert classify_scope_overlap(("m-001",), (("m-010",),)) == "non_overlapping_scope"
+
+
+def test_build_phase_quality_metrics_reports_bounded_phase_outputs() -> None:
+    metrics = build_phase_quality_metrics(
+        suppressed_phase_count=1,
+        phase_boundary_merged_count=1,
+        phase_boundary_retained_count=2,
+        phase_representative_interaction_cap=3,
+        phase_pair_evidence_cap=5,
+        phase_pair_evidence_phase_cap=5,
+        phase_diagnostics_count=9,
+    )
+
+    assert metrics == {
+        "suppressed_phase_count": 1,
+        "phase_boundary_merged_count": 1,
+        "phase_boundary_retained_count": 2,
+        "phase_representative_interaction_cap": 3,
+        "phase_pair_evidence_cap": 5,
+        "phase_pair_evidence_phase_cap": 5,
+        "phase_diagnostics_count": 9,
+    }

@@ -68,6 +68,13 @@ Running `build_nlpdata` against a bundle now also writes:
 
 ```text
 data_exports/<bundle>/derived/nlpdata/
+├── phases.jsonl
+├── phase_central_people.jsonl
+├── phase_theme_summaries.jsonl
+├── phase_pair_summaries.jsonl
+├── phase_pair_evidence.jsonl
+├── phase_representative_interactions.jsonl
+├── phase_diagnostics.jsonl
 ├── reviewed_effects.jsonl
 ├── person_person_edges.jsonl
 ├── person_person_edge_evidence.jsonl
@@ -100,6 +107,30 @@ The publish-hardening artifacts are published here:
 - [Publish Hardening Spec](specs/005-nlpdata-publish-hardening/spec.md)
 - [Bounded Publish Contract](specs/005-nlpdata-publish-hardening/contracts/bounded-publish-semantics.md)
 - [ADR 004: nlpdata Publish Semantics](docs/adr/004-nlpdata-publish-semantics.md)
+
+## Phase and Temporal Outputs
+
+Phase 4 now publishes first-class inferred phase outputs through the same
+`build_nlpdata` pipeline:
+
+- `phases`
+- `phase_central_people`
+- `phase_theme_summaries`
+- `phase_pair_summaries`
+- `phase_pair_evidence`
+- `phase_representative_interactions`
+- `phase_diagnostics`
+
+These outputs are owner-centric, derived-only, and bounded. They support phase
+list/detail exploration in downstream consumers without recomputing temporal
+segmentation locally.
+
+The Phase 4 artifacts are published here:
+
+- [Phase Outputs Spec](specs/007-phase-temporal-outputs/spec.md)
+- [Phase Output Contract](specs/007-phase-temporal-outputs/contracts/phase-output-contracts.md)
+- [ADR 005: Phase as a First-Class Derived Object](docs/adr/005-phase-first-class-object.md)
+- [ADR 006: Phase Output Contract](docs/adr/006-phase-output-contract.md)
 
 ## Quickstart
 
@@ -194,6 +225,13 @@ This writes:
 
 ```text
 data_exports/<bundle>/derived/nlpdata/
+├── phases.jsonl
+├── phase_central_people.jsonl
+├── phase_theme_summaries.jsonl
+├── phase_pair_summaries.jsonl
+├── phase_pair_evidence.jsonl
+├── phase_representative_interactions.jsonl
+├── phase_diagnostics.jsonl
 ├── reviewed_effects.jsonl
 ├── person_person_edges.jsonl
 ├── person_person_edge_evidence.jsonl

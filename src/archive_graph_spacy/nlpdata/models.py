@@ -14,6 +14,8 @@ class SourceBundle:
     messages: tuple[Message, ...]
     reviewed_assertions: tuple[dict[str, object], ...] = ()
     review_assertion_decisions: tuple[dict[str, object], ...] = ()
+    existing_person_person_edges: tuple[dict[str, object], ...] = ()
+    existing_person_person_edge_evidence: tuple[dict[str, object], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -161,6 +163,114 @@ class PersonPersonEdgeEvidenceRecord:
 
 
 @dataclass(frozen=True)
+class PhaseRecord:
+    phase_id: str
+    run_id: str
+    generation_scope: str
+    phase_index: int
+    start_at: str
+    end_at: str
+    interaction_count: int
+    representative_interaction_ref: str
+    boundary_reason: str
+    is_current: bool = True
+
+    def to_record(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class PhaseCentralPersonRecord:
+    phase_id: str
+    run_id: str
+    person_id: str
+    rank: int
+    centrality_score: float
+    interaction_count: int
+    evidence_ref: str
+    is_current: bool = True
+
+    def to_record(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class PhaseThemeSummaryRecord:
+    phase_id: str
+    run_id: str
+    theme: str
+    rank: int
+    theme_score: float
+    message_count: int
+    evidence_ref: str
+    is_current: bool = True
+
+    def to_record(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class PhasePairSummaryRecord:
+    phase_pair_id: str
+    phase_id: str
+    pair_id: str
+    run_id: str
+    pair_rank: int
+    activity_score: float
+    relationship_signal: str
+    evidence_count: int
+    strongest_evidence_ref: str
+    is_current: bool = True
+
+    def to_record(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class PhasePairEvidenceRecord:
+    phase_pair_evidence_id: str
+    phase_pair_id: str
+    phase_id: str
+    pair_id: str
+    source_ref: str
+    message_ref: str
+    evidence_family: str
+    rank_within_phase_pair: int
+    contribution_score: float
+    is_current: bool = True
+
+    def to_record(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class PhaseRepresentativeInteractionRecord:
+    phase_id: str
+    run_id: str
+    interaction_ref: str
+    rank: int
+    selection_reason: str
+    is_current: bool = True
+
+    def to_record(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class PhaseDiagnosticsRecord:
+    run_id: str
+    phase_id: str
+    diagnostic_type: str
+    result: str
+    reason_code: str
+    sample_ref: str
+    details: str
+
+    def to_record(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class ThemeTag:
     theme_tag_id: str
     run_id: str
@@ -220,6 +330,13 @@ class PipelineResult:
     reviewed_effects: tuple[ReviewedEffectResult, ...] = ()
     person_person_edges: tuple[PersonPersonEdgeRecord, ...] = ()
     person_person_edge_evidence: tuple[PersonPersonEdgeEvidenceRecord, ...] = ()
+    phases: tuple[PhaseRecord, ...] = ()
+    phase_central_people: tuple[PhaseCentralPersonRecord, ...] = ()
+    phase_theme_summaries: tuple[PhaseThemeSummaryRecord, ...] = ()
+    phase_pair_summaries: tuple[PhasePairSummaryRecord, ...] = ()
+    phase_pair_evidence: tuple[PhasePairEvidenceRecord, ...] = ()
+    phase_representative_interactions: tuple[PhaseRepresentativeInteractionRecord, ...] = ()
+    phase_diagnostics: tuple[PhaseDiagnosticsRecord, ...] = ()
     suppressed_counts: dict[str, int] = field(default_factory=dict)
 
 
