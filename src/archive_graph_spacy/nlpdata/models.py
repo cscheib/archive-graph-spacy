@@ -232,6 +232,7 @@ class PhasePairEvidenceRecord:
     phase_pair_id: str
     phase_id: str
     pair_id: str
+    run_id: str
     source_ref: str
     message_ref: str
     evidence_family: str

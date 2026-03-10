@@ -200,6 +200,7 @@ def _write_payload_fixture(tmp_path: Path, run_id: str = "run-123") -> None:
                 "phase_pair_id": "phase-pair-001",
                 "phase_id": "phase-001",
                 "pair_id": "pair-001",
+                "run_id": run_id,
                 "source_ref": "message:m-001",
                 "message_ref": "m-001",
                 "evidence_family": "direct_participation",
@@ -351,6 +352,7 @@ def test_deploy_staged_payload_creates_schema_and_merges_current_tables(monkeypa
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`person_person_edges`" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`phases`" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`phase_pair_summaries`" in stmt for stmt in sql_client.statements)
+    assert any("UPDATE `personal_archive_dev`.`nlpdata`.`phase_pair_evidence`" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`message_theme_tags`" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`message_search_docs`" in stmt for stmt in sql_client.statements)
     assert any("INSERT INTO `personal_archive_dev`.`nlpdata`.nlp_runs" in stmt for stmt in sql_client.statements)
@@ -359,6 +361,16 @@ def test_deploy_staged_payload_creates_schema_and_merges_current_tables(monkeypa
     activate_index = max(i for i, stmt in enumerate(sql_client.statements) if "SET is_current = true" in stmt and "`message_person_links`" in stmt)
     assert insert_index < deactivate_index < activate_index
     assert "false" in sql_client.statements[insert_index]
+    assert any(
+        "UPDATE `personal_archive_dev`.`nlpdata`.`phase_pair_summaries`" in stmt
+        and "SELECT DISTINCT `phase_id`" in stmt
+        for stmt in sql_client.statements
+    )
+    assert any(
+        "INSERT INTO `personal_archive_dev`.`nlpdata`.phase_pair_evidence" in stmt
+        and "\n  run_id,\n" in stmt
+        for stmt in sql_client.statements
+    )
 
 
 def test_collect_bounded_publish_scope_tracks_non_message_identity_values(tmp_path: Path) -> None:

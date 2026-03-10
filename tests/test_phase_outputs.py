@@ -44,6 +44,7 @@ def test_run_pipeline_derives_phase_child_tables() -> None:
     assert any(row.theme == "travel" for row in result.phase_theme_summaries)
     assert any(row.theme == "work" for row in result.phase_theme_summaries)
     assert any(row.pair_id for row in result.phase_pair_summaries)
+    assert all(row.run_id == result.run.run_id for row in result.phase_pair_evidence)
     assert any(row.evidence_family == "direct_participation" for row in result.phase_pair_evidence)
 
 
@@ -56,9 +57,32 @@ def test_run_pipeline_records_boundary_and_suppression_diagnostics() -> None:
     assert any(row.diagnostic_type == "boundary" and row.result == "merged" for row in result.phase_diagnostics)
     assert any(row.diagnostic_type == "boundary" and row.result == "retained" for row in result.phase_diagnostics)
     assert any(row.diagnostic_type == "suppression" and row.result == "suppressed" for row in result.phase_diagnostics)
+    phase_ids = {row.phase_id for row in result.phases}
+    assert all(
+        row.phase_id in phase_ids
+        for row in result.phase_diagnostics
+        if row.diagnostic_type == "boundary"
+    )
     assert result.run.output_row_counts["phases"] == len(result.phases)
     assert result.run.output_row_counts["phase_diagnostics"] == len(result.phase_diagnostics)
     assert result.run.quality_metrics["suppressed_phase_count"] >= 1
+
+
+def test_run_pipeline_retains_fractional_day_boundary_thresholds() -> None:
+    result = run_pipeline(
+        load_source_bundle("data_samples/phase_temporal_outputs"),
+        run_scope="data_samples/phase_temporal_outputs",
+    )
+
+    retained = [
+        row for row in result.phase_diagnostics if row.diagnostic_type == "boundary" and row.result == "retained"
+    ]
+    merged = [
+        row for row in result.phase_diagnostics if row.diagnostic_type == "boundary" and row.result == "merged"
+    ]
+
+    assert any("49.875" in row.details for row in retained)
+    assert any("18.250" in row.details for row in merged)
 
 
 def test_phase_outputs_remain_bounded() -> None:

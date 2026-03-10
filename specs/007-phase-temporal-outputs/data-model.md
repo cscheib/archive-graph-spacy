@@ -70,7 +70,7 @@ a phase.
 
 **Fields**
 - `phase_id`
-- `theme_key`
+- `theme`
 - `rank`
 - `theme_score`
 - `message_count`

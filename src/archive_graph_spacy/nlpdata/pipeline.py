@@ -140,38 +140,19 @@ def _derive_phase_outputs(
 
     retained_boundary_indexes: set[int] = set()
     diagnostics: list[PhaseDiagnosticsRecord] = []
+    boundary_candidates: list[tuple[str, float, str]] = []
     merged_count = 0
     retained_count = 0
     for index, (left, right) in enumerate(zip(sorted_messages, sorted_messages[1:]), start=1):
         assert left.timestamp is not None and right.timestamp is not None
-        gap_days = (right.timestamp - left.timestamp).days
+        gap_days = (right.timestamp - left.timestamp).total_seconds() / 86400
         if gap_days >= RETAIN_BOUNDARY_DAYS:
             retained_boundary_indexes.add(index)
             retained_count += 1
-            diagnostics.append(
-                PhaseDiagnosticsRecord(
-                    run_id=run_id,
-                    phase_id=f"boundary-{index}",
-                    diagnostic_type="boundary",
-                    result="retained",
-                    reason_code="gap_retained",
-                    sample_ref=f"message:{right.message_id}",
-                    details=f"retained boundary after {gap_days} day gap",
-                )
-            )
+            boundary_candidates.append(("retained", gap_days, right.message_id))
         elif gap_days >= MERGED_BOUNDARY_DAYS:
             merged_count += 1
-            diagnostics.append(
-                PhaseDiagnosticsRecord(
-                    run_id=run_id,
-                    phase_id=f"boundary-{index}",
-                    diagnostic_type="boundary",
-                    result="merged",
-                    reason_code="gap_merged",
-                    sample_ref=f"message:{right.message_id}",
-                    details=f"merged candidate boundary after {gap_days} day gap",
-                )
-            )
+            boundary_candidates.append(("merged", gap_days, right.message_id))
 
     segments: list[tuple[Message, ...]] = []
     current_segment: list[Message] = []
@@ -182,6 +163,31 @@ def _derive_phase_outputs(
             current_segment = []
     if current_segment:
         segments.append(tuple(current_segment))
+    segment_phase_ids = {
+        segment[0].message_id: _phase_id(generation_scope, tuple(message.message_id for message in segment))
+        for segment in segments
+    }
+    boundary_phase_ids: dict[str, str] = {}
+    previous_published_phase_id: str | None = None
+    for segment in segments:
+        phase_id = segment_phase_ids[segment[0].message_id]
+        if len(segment) >= MIN_PHASE_INTERACTIONS:
+            previous_published_phase_id = phase_id
+        boundary_phase_id = previous_published_phase_id or phase_id
+        for message in segment:
+            boundary_phase_ids[message.message_id] = boundary_phase_id
+    for result, gap_days, right_message_id in boundary_candidates:
+        diagnostics.append(
+            PhaseDiagnosticsRecord(
+                run_id=run_id,
+                phase_id=boundary_phase_ids[right_message_id],
+                diagnostic_type="boundary",
+                result=result,
+                reason_code=f"gap_{result}",
+                sample_ref=f"message:{right_message_id}",
+                details=f"{result} boundary after {gap_days:.3f} day gap",
+            )
+        )
 
     phases: list[PhaseRecord] = []
     phase_central_people: list[PhaseCentralPersonRecord] = []
@@ -192,8 +198,7 @@ def _derive_phase_outputs(
     suppressed_phase_count = 0
 
     for segment in segments:
-        message_ids = tuple(message.message_id for message in segment)
-        phase_id = _phase_id(generation_scope, message_ids)
+        phase_id = segment_phase_ids[segment[0].message_id]
         if len(segment) < MIN_PHASE_INTERACTIONS:
             suppressed_phase_count += 1
             diagnostics.append(
@@ -364,6 +369,7 @@ def _derive_phase_outputs(
                         phase_pair_id=phase_pair_id,
                         phase_id=phase_id,
                         pair_id=pair_id,
+                        run_id=run_id,
                         source_ref=row.source_ref,
                         message_ref=row.message_ref,
                         evidence_family=row.evidence_family,

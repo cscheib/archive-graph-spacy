@@ -46,6 +46,15 @@ def test_spark_schema_for_phase_pair_summaries_covers_phase_outputs() -> None:
     assert "is_current BOOLEAN" in schema
 
 
+def test_spark_schema_for_phase_pair_evidence_includes_run_id() -> None:
+    schema = spark_schema_for_table("phase_pair_evidence")
+
+    assert "phase_pair_evidence_id STRING" in schema
+    assert "phase_id STRING" in schema
+    assert "run_id STRING" in schema
+    assert "contribution_score DOUBLE" in schema
+
+
 def test_create_temp_view_from_rows_supplies_explicit_schema() -> None:
     spark = FakeSparkSession()
     rows = [

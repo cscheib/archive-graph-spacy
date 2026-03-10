@@ -47,7 +47,7 @@ Ranked people per phase containing at least:
 Ranked themes per phase containing at least:
 
 - `phase_id`
-- `theme_key`
+- `theme`
 - `rank`
 - theme score
 - evidence pointer

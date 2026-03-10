@@ -147,6 +147,7 @@ TABLE_CONTRACTS: dict[str, tuple[str, ...]] = {
         "phase_pair_id",
         "phase_id",
         "pair_id",
+        "run_id",
         "source_ref",
         "message_ref",
         "evidence_family",
