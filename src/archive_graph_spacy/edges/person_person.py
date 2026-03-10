@@ -12,6 +12,8 @@ from archive_graph_spacy.models import (
 )
 from archive_graph_spacy.nlpdata.models import PersonMessageLink, PersonPersonEdgeEvidenceRecord, PersonPersonEdgeRecord
 
+MAX_EVIDENCE_ROWS_PER_PAIR = 5
+
 
 def _pair_ids(left: str, right: str) -> tuple[str, str]:
     return tuple(sorted((left, right)))
@@ -193,6 +195,8 @@ def build_nlpdata_person_person_outputs(
     ranked_evidence: list[PersonPersonEdgeEvidenceRecord] = []
     rank_by_pair: dict[str, int] = defaultdict(int)
     for row in ordered_evidence:
+        if rank_by_pair[row.pair_id] >= MAX_EVIDENCE_ROWS_PER_PAIR:
+            continue
         rank_by_pair[row.pair_id] += 1
         ranked_evidence.append(
             PersonPersonEdgeEvidenceRecord(
@@ -236,5 +240,5 @@ def build_nlpdata_person_person_outputs(
 
     return (
         tuple(sorted(summaries, key=lambda row: (row.person_a_id, row.person_b_id))),
-        tuple(ranked_evidence),
+        tuple(sorted(ranked_evidence, key=lambda row: (row.pair_id, row.rank_within_pair, row.pair_evidence_id))),
     )

@@ -9,7 +9,7 @@ from pathlib import Path
 from archive_graph_spacy.io import load_export_bundle
 from archive_graph_spacy.models import Contact, Message
 
-from .databricks import DatabricksSqlClient, get_workspace_client, quote_sql_identifier
+from .databricks import DatabricksSqlClient, DatabricksSqlError, get_workspace_client, quote_sql_identifier
 from .models import SourceBundle
 
 DEFAULT_WAREHOUSE_ID = "4b799682f2bfd311"
@@ -20,6 +20,10 @@ DEFAULT_INTERACTION_TYPES = (
     "dating_notification",
     "linkedin_notification",
     "payment_notification",
+)
+SUPPORTED_REVIEWED_ASSERTION_TYPES = (
+    "relay_sender_identity",
+    "person_link_disambiguation",
 )
 
 
@@ -49,6 +53,11 @@ def _read_optional_jsonl(path: Path) -> list[dict[str, object]]:
 
 def _quote_sql_string(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
+
+
+def _is_missing_table_error(exc: DatabricksSqlError) -> bool:
+    message = str(exc).casefold()
+    return "table_or_view_not_found" in message or "not found" in message or "does not exist" in message
 
 
 def _ensure_list(value: object) -> tuple[str, ...]:
@@ -178,6 +187,11 @@ def load_source_bundle_from_databricks(
         {message_limit_sql}
     """
     messages_rows = client.fetch_all(messages_query)
+    message_ids = tuple(
+        str(row["message_id"])
+        for row in messages_rows
+        if row.get("message_id")
+    )
 
     people_limit_sql = f"LIMIT {people_limit}" if people_limit is not None else ""
     contacts_query = f"""
@@ -196,6 +210,11 @@ def load_source_bundle_from_databricks(
         {people_limit_sql}
     """
     contacts_rows = client.fetch_all(contacts_query)
+    if not message_ids:
+        return source_bundle_from_rows(contacts_rows, messages_rows)
+
+    quoted_supported_types = ", ".join(_quote_sql_string(value) for value in SUPPORTED_REVIEWED_ASSERTION_TYPES)
+    quoted_message_ids = ", ".join(_quote_sql_string(value) for value in message_ids)
     reviewed_assertions_query = f"""
         SELECT
             candidate_assertion_id,
@@ -212,6 +231,8 @@ def load_source_bundle_from_databricks(
             confidence_level,
             CAST(updated_at AS STRING) AS updated_at
         FROM {quoted_catalog}.memory.reviewed_assertions
+        WHERE assertion_type IN ({quoted_supported_types})
+          AND subject_canonical_id IN ({quoted_message_ids})
     """
     review_assertion_decisions_query = f"""
         SELECT
@@ -224,14 +245,24 @@ def load_source_bundle_from_databricks(
             evidence_snapshot,
             promotion_intent
         FROM {quoted_catalog}.memory.review_assertion_decisions
+        WHERE candidate_assertion_id IN (
+            SELECT candidate_assertion_id
+            FROM {quoted_catalog}.memory.reviewed_assertions
+            WHERE assertion_type IN ({quoted_supported_types})
+              AND subject_canonical_id IN ({quoted_message_ids})
+        )
     """
     try:
         reviewed_assertion_rows = client.fetch_all(reviewed_assertions_query)
-    except Exception:
+    except DatabricksSqlError as exc:
+        if not _is_missing_table_error(exc):
+            raise
         reviewed_assertion_rows = []
     try:
         review_assertion_decision_rows = client.fetch_all(review_assertion_decisions_query)
-    except Exception:
+    except DatabricksSqlError as exc:
+        if not _is_missing_table_error(exc):
+            raise
         review_assertion_decision_rows = []
     return source_bundle_from_rows(
         contacts_rows,

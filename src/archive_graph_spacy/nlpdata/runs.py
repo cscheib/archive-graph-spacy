@@ -103,10 +103,11 @@ def semantic_replay_key(
     assertion_type: str,
     subject_canonical_id: str,
     proposed_claim: str,
+    generation_scope: str | None = None,
 ) -> str:
     normalized_claim = " ".join(proposed_claim.strip().split()).casefold()
     normalized_claim = MENTION_ID_TOKEN.sub("<mention>", normalized_claim)
     digest = hashlib.sha1(
-        f"{assertion_type}|{subject_canonical_id}|{normalized_claim}".encode("utf-8")
+        f"{assertion_type}|{subject_canonical_id}|{normalized_claim}|{generation_scope or ''}".encode("utf-8")
     ).hexdigest()[:16]
     return f"srk-{digest}"

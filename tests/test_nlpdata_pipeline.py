@@ -111,11 +111,30 @@ def test_semantic_replay_key_tolerates_mention_identifier_drift() -> None:
         assertion_type="person_link_disambiguation",
         subject_canonical_id="m-ambiguous-jamie",
         proposed_claim="mention mm-123abc 'Jamie' is ambiguous across p-jamie-a, p-jamie-b",
+        generation_scope="scope-a",
     )
     second = semantic_replay_key(
         assertion_type="person_link_disambiguation",
         subject_canonical_id="m-ambiguous-jamie",
         proposed_claim="mention im-b7d27d726aae 'Jamie' is ambiguous across p-jamie-a, p-jamie-b",
+        generation_scope="scope-a",
     )
 
     assert first == second
+
+
+def test_semantic_replay_key_separates_generation_scopes() -> None:
+    first = semantic_replay_key(
+        assertion_type="relay_sender_identity",
+        subject_canonical_id="m-relay-bob",
+        proposed_claim="relay sender relay+bob@relay.example.com maps to p-bob",
+        generation_scope="scope-a",
+    )
+    second = semantic_replay_key(
+        assertion_type="relay_sender_identity",
+        subject_canonical_id="m-relay-bob",
+        proposed_claim="relay sender relay+bob@relay.example.com maps to p-bob",
+        generation_scope="scope-b",
+    )
+
+    assert first != second

@@ -586,6 +586,7 @@ def _collect_bounded_publish_scope(
     active_scope_message_ids: tuple[tuple[str, ...], ...],
 ) -> BoundedPublishScope:
     message_ids: set[str] = set()
+    identity_values: set[str] = set()
     affected_tables: list[str] = []
     for table_name in CURRENT_STATE_TABLES:
         rows = _load_jsonl_rows(local_dir / f"{table_name}.jsonl")
@@ -597,15 +598,19 @@ def _collect_bounded_publish_scope(
         }
         if table_identity_values:
             affected_tables.append(table_name)
+            identity_values.update(f"{table_name}:{value}" for value in table_identity_values)
             if identity_column == "message_id":
                 message_ids.update(table_identity_values)
     affected_message_ids = tuple(sorted(message_ids))
+    affected_identity_values = tuple(sorted(identity_values))
+    overlap_scope_ids = tuple(sorted(set(affected_message_ids) | set(affected_identity_values)))
     return BoundedPublishScope(
         run_id=run_id,
         run_scope=_load_run_scope(local_dir, run_id),
         affected_message_ids=affected_message_ids,
+        affected_identity_values=affected_identity_values,
         affected_tables=tuple(sorted(affected_tables)),
-        overlap_class=classify_scope_overlap(affected_message_ids, active_scope_message_ids),
+        overlap_class=classify_scope_overlap(overlap_scope_ids, active_scope_message_ids),
     )
 
 
@@ -689,7 +694,10 @@ def deploy_staged_payload(
         recovery_action = "none"
     except Exception as exc:
         failed_tables = [table for table in publish_scope.affected_tables if table not in finalized_tables]
-        manual_intervention_required = not publish_scope.affected_message_ids or publish_stage != "finalizing"
+        manual_intervention_required = (
+            not (publish_scope.affected_identity_values or publish_scope.affected_message_ids)
+            or publish_stage != "finalizing"
+        )
         publish_outcome = "partial" if finalized_tables else "failed"
         recovery_action = "manual_intervention" if manual_intervention_required else "rerun_same_scope"
         error_detail = str(exc)

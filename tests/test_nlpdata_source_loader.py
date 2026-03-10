@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from archive_graph_spacy.nlpdata.databricks import DatabricksSqlError
 from archive_graph_spacy.nlpdata.source_loader import load_source_bundle_from_databricks
 
 
@@ -12,14 +13,14 @@ class FakeSqlClient:
 
     def fetch_all(self, statement: str):
         self.queries.append(statement)
+        if "FROM `personal_archive_dev`.memory.review_assertion_decisions" in statement:
+            return self.rows.get("review_assertion_decisions", [])
         if "FROM `personal_archive_dev`.gold.interactions" in statement:
             return self.rows["messages"]
         if "FROM `personal_archive_dev`.gold.persons" in statement:
             return self.rows["contacts"]
         if "FROM `personal_archive_dev`.memory.reviewed_assertions" in statement:
             return self.rows.get("reviewed_assertions", [])
-        if "FROM `personal_archive_dev`.memory.review_assertion_decisions" in statement:
-            return self.rows.get("review_assertion_decisions", [])
         raise AssertionError(f"Unexpected query: {statement}")
 
 
@@ -90,6 +91,8 @@ def test_load_source_bundle_from_databricks_maps_rows(monkeypatch) -> None:
     assert bundle.review_assertion_decisions[0]["decision_state"] == "accepted"
     assert any("LIMIT 100" in query for query in fake_client.queries)
     assert any("LIMIT 200" in query for query in fake_client.queries)
+    assert any("assertion_type IN ('relay_sender_identity', 'person_link_disambiguation')" in query for query in fake_client.queries)
+    assert any("subject_canonical_id IN ('m-001')" in query for query in fake_client.queries)
 
 
 def test_load_source_bundle_from_databricks_rejects_invalid_catalog(monkeypatch) -> None:
@@ -104,3 +107,39 @@ def test_load_source_bundle_from_databricks_rejects_invalid_catalog(monkeypatch)
 
     with pytest.raises(ValueError, match="Invalid SQL identifier"):
         load_source_bundle_from_databricks(catalog="personal_archive_dev;DROP TABLE gold.interactions")
+
+
+def test_load_source_bundle_from_databricks_only_swallows_missing_review_tables(monkeypatch) -> None:
+    class ErroringSqlClient(FakeSqlClient):
+        def fetch_all(self, statement: str):
+            if "memory.reviewed_assertions" in statement:
+                raise DatabricksSqlError("PERMISSION_DENIED: simulated")
+            return super().fetch_all(statement)
+
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.source_loader.get_workspace_client",
+        lambda profile=None: SimpleNamespace(),
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.source_loader.DatabricksSqlClient",
+        lambda workspace_client, warehouse_id: ErroringSqlClient(
+            {
+                "contacts": [],
+                "messages": [
+                    {
+                        "message_id": "m-001",
+                        "source": "email",
+                        "sender": "alice@example.com",
+                        "recipients": [],
+                        "subject": "Trip",
+                        "body": "Flight hotel trip",
+                        "timestamp": None,
+                        "interaction_type": "email",
+                    }
+                ],
+            }
+        ),
+    )
+
+    with pytest.raises(DatabricksSqlError, match="PERMISSION_DENIED"):
+        load_source_bundle_from_databricks(catalog="personal_archive_dev")
