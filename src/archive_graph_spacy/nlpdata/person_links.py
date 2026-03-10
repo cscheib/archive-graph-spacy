@@ -60,6 +60,12 @@ def _candidate_id(assertion_type: str, subject_canonical_id: str, proposed_claim
     return f"ca-{digest}"
 
 
+def _canonical_pair_id(person_a_id: str, person_b_id: str) -> str:
+    readable_pair_id = "|".join(sorted((person_a_id, person_b_id)))
+    digest = hashlib.sha1(readable_pair_id.encode("utf-8")).hexdigest()[:12]
+    return f"pair-{digest}"
+
+
 def _generated_at() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -198,23 +204,24 @@ def _relationship_evidence_candidate(
     indirect_count: int,
     evidence_refs: tuple[str, ...],
 ) -> CandidateAssertion:
-    pair_id = "|".join(sorted((person_a_id, person_b_id)))
+    readable_pair_id = "|".join(sorted((person_a_id, person_b_id)))
+    pair_canonical_id = _canonical_pair_id(person_a_id, person_b_id)
     proposed_claim = (
-        f"pair {pair_id} has conflicting relationship evidence "
+        f"pair {readable_pair_id} has conflicting relationship evidence "
         f"(direct={direct_count}, indirect={indirect_count})"
     )
     return CandidateAssertion(
         candidate_assertion_id=_candidate_id(
             "relationship_evidence_review",
-            pair_id,
+            pair_canonical_id,
             proposed_claim,
             generation_scope,
         ),
         run_id=run_id,
         assertion_type="relationship_evidence_review",
-        subject_canonical_id=pair_id,
+        subject_canonical_id=pair_canonical_id,
         proposed_claim=proposed_claim,
-        evidence_refs=evidence_refs,
+        evidence_refs=evidence_refs + (f"pair_id:{pair_canonical_id}",),
         provenance_summary=(
             "Derived from mixed direct and indirect pair evidence across the bounded run"
         ),

@@ -111,6 +111,8 @@ def test_relationship_evidence_review_candidates_use_shared_candidate_contract()
     assert candidates[0].review_class == "reviewable"
     assert candidates[0].promotion_class == "derived_only"
     assert any(ref.startswith("pair:") for ref in candidates[0].evidence_refs)
+    assert any(ref.startswith("pair_id:pair-") for ref in candidates[0].evidence_refs)
+    assert candidates[0].subject_canonical_id.startswith("pair-")
 
 
 def test_normalized_reviewed_inputs_parses_stringified_evidence_refs() -> None:
