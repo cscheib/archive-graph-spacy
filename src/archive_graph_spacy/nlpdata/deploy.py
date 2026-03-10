@@ -22,8 +22,16 @@ DEFAULT_SCHEMA = "nlpdata"
 
 CURRENT_STATE_TABLES = {
     "message_person_links",
+    "person_person_edges",
     "message_theme_tags",
     "message_search_docs",
+}
+
+CURRENT_STATE_IDENTITY_COLUMNS = {
+    "message_person_links": "message_id",
+    "person_person_edges": "pair_id",
+    "message_theme_tags": "message_id",
+    "message_search_docs": "message_id",
 }
 
 TABLE_DDLS: dict[str, str] = {
@@ -69,6 +77,45 @@ CREATE TABLE IF NOT EXISTS {catalog}.{schema}.message_person_links (
   evidence_value STRING,
   source_interaction_id STRING,
   is_current BOOLEAN
+) USING DELTA
+""".strip(),
+    "reviewed_effects": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.reviewed_effects (
+  run_id STRING,
+  candidate_assertion_id STRING,
+  assertion_type STRING,
+  subject_canonical_id STRING,
+  result STRING,
+  reason_code STRING,
+  details STRING
+) USING DELTA
+""".strip(),
+    "person_person_edges": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.person_person_edges (
+  pair_id STRING,
+  person_a_id STRING,
+  person_b_id STRING,
+  run_id STRING,
+  generation_scope STRING,
+  strength_score DOUBLE,
+  relationship_signal STRING,
+  direct_evidence_count BIGINT,
+  indirect_evidence_count BIGINT,
+  strongest_evidence_ref STRING,
+  is_current BOOLEAN
+) USING DELTA
+""".strip(),
+    "person_person_edge_evidence": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.person_person_edge_evidence (
+  pair_evidence_id STRING,
+  pair_id STRING,
+  evidence_family STRING,
+  source_ref STRING,
+  contribution_score DOUBLE,
+  rank_within_pair INT,
+  message_ref STRING,
+  theme_refs ARRAY<STRING>,
+  provenance STRING
 ) USING DELTA
 """.strip(),
     "message_theme_tags": """
@@ -142,6 +189,39 @@ TABLE_COLUMN_TYPES: dict[str, dict[str, str]] = {
         "evidence_value": "STRING",
         "source_interaction_id": "STRING",
         "is_current": "BOOLEAN",
+    },
+    "reviewed_effects": {
+        "run_id": "STRING",
+        "candidate_assertion_id": "STRING",
+        "assertion_type": "STRING",
+        "subject_canonical_id": "STRING",
+        "result": "STRING",
+        "reason_code": "STRING",
+        "details": "STRING",
+    },
+    "person_person_edges": {
+        "pair_id": "STRING",
+        "person_a_id": "STRING",
+        "person_b_id": "STRING",
+        "run_id": "STRING",
+        "generation_scope": "STRING",
+        "strength_score": "DOUBLE",
+        "relationship_signal": "STRING",
+        "direct_evidence_count": "BIGINT",
+        "indirect_evidence_count": "BIGINT",
+        "strongest_evidence_ref": "STRING",
+        "is_current": "BOOLEAN",
+    },
+    "person_person_edge_evidence": {
+        "pair_evidence_id": "STRING",
+        "pair_id": "STRING",
+        "evidence_family": "STRING",
+        "source_ref": "STRING",
+        "contribution_score": "DOUBLE",
+        "rank_within_pair": "INT",
+        "message_ref": "STRING",
+        "theme_refs": "ARRAY<STRING>",
+        "provenance": "STRING",
     },
     "message_theme_tags": {
         "theme_tag_id": "STRING",
@@ -218,6 +298,48 @@ SELECT
   evidence_value,
   source_interaction_id,
   CAST(is_current AS BOOLEAN)
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
+    "reviewed_effects": """
+INSERT INTO {catalog}.{schema}.reviewed_effects
+SELECT
+  run_id,
+  candidate_assertion_id,
+  assertion_type,
+  subject_canonical_id,
+  result,
+  reason_code,
+  details
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
+    "person_person_edges": """
+INSERT INTO {catalog}.{schema}.person_person_edges
+SELECT
+  pair_id,
+  person_a_id,
+  person_b_id,
+  run_id,
+  generation_scope,
+  CAST(strength_score AS DOUBLE),
+  relationship_signal,
+  CAST(direct_evidence_count AS BIGINT),
+  CAST(indirect_evidence_count AS BIGINT),
+  strongest_evidence_ref,
+  CAST(is_current AS BOOLEAN)
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
+    "person_person_edge_evidence": """
+INSERT INTO {catalog}.{schema}.person_person_edge_evidence
+SELECT
+  pair_evidence_id,
+  pair_id,
+  evidence_family,
+  source_ref,
+  CAST(contribution_score AS DOUBLE),
+  CAST(rank_within_pair AS INT),
+  message_ref,
+  from_json(to_json(theme_refs), 'array<string>'),
+  provenance
 FROM read_files({remote_path}, format => 'json')
 """.strip(),
     "message_theme_tags": """
@@ -320,6 +442,7 @@ def _show_columns_sql(catalog: str, schema: str, table_name: str) -> str:
 
 
 def _deactivate_current_rows_sql(catalog: str, schema: str, table_name: str, remote_path: str) -> str:
+    identity_column = CURRENT_STATE_IDENTITY_COLUMNS[table_name]
     qualified_table = ".".join(
         (
             quote_sql_identifier(catalog),
@@ -331,14 +454,15 @@ def _deactivate_current_rows_sql(catalog: str, schema: str, table_name: str, rem
 UPDATE {qualified_table}
 SET is_current = false
 WHERE is_current = true
-  AND message_id IN (
-    SELECT DISTINCT message_id
+  AND {quote_sql_identifier(identity_column)} IN (
+    SELECT DISTINCT {quote_sql_identifier(identity_column)}
     FROM read_files({quote_sql_string_literal(remote_path)}, format => 'json')
   )
 """.strip()
 
 
 def _activate_staged_rows_sql(catalog: str, schema: str, table_name: str, run_id: str, remote_path: str) -> str:
+    identity_column = CURRENT_STATE_IDENTITY_COLUMNS[table_name]
     qualified_table = ".".join(
         (
             quote_sql_identifier(catalog),
@@ -350,8 +474,8 @@ def _activate_staged_rows_sql(catalog: str, schema: str, table_name: str, run_id
 UPDATE {qualified_table}
 SET is_current = true
 WHERE run_id = {quote_sql_string_literal(run_id)}
-  AND message_id IN (
-    SELECT DISTINCT message_id
+  AND {quote_sql_identifier(identity_column)} IN (
+    SELECT DISTINCT {quote_sql_identifier(identity_column)}
     FROM read_files({quote_sql_string_literal(remote_path)}, format => 'json')
   )
 """.strip()
@@ -465,14 +589,16 @@ def _collect_bounded_publish_scope(
     affected_tables: list[str] = []
     for table_name in CURRENT_STATE_TABLES:
         rows = _load_jsonl_rows(local_dir / f"{table_name}.jsonl")
-        table_message_ids = {
-            str(row["message_id"])
+        identity_column = CURRENT_STATE_IDENTITY_COLUMNS[table_name]
+        table_identity_values = {
+            str(row[identity_column])
             for row in rows
-            if row.get("run_id") == run_id and row.get("message_id")
+            if row.get("run_id") == run_id and row.get(identity_column)
         }
-        if table_message_ids:
+        if table_identity_values:
             affected_tables.append(table_name)
-            message_ids.update(table_message_ids)
+            if identity_column == "message_id":
+                message_ids.update(table_identity_values)
     affected_message_ids = tuple(sorted(message_ids))
     return BoundedPublishScope(
         run_id=run_id,

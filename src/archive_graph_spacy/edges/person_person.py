@@ -10,6 +10,7 @@ from archive_graph_spacy.models import (
     PersonPersonEdge,
     PersonPersonEdgeEvidence,
 )
+from archive_graph_spacy.nlpdata.models import PersonMessageLink, PersonPersonEdgeEvidenceRecord, PersonPersonEdgeRecord
 
 
 def _pair_ids(left: str, right: str) -> tuple[str, str]:
@@ -124,3 +125,116 @@ def aggregate_person_person_edges(
         )
 
     return sorted(aggregated, key=lambda row: (row.person_a_id, row.person_b_id))
+
+
+def _pair_id(person_a_id: str, person_b_id: str) -> str:
+    digest = hashlib.sha1(f"{person_a_id}|{person_b_id}".encode("utf-8")).hexdigest()[:12]
+    return f"pair-{digest}"
+
+
+def build_nlpdata_person_person_outputs(
+    person_links: tuple[PersonMessageLink, ...],
+    *,
+    run_id: str,
+    generation_scope: str,
+) -> tuple[tuple[PersonPersonEdgeRecord, ...], tuple[PersonPersonEdgeEvidenceRecord, ...]]:
+    by_message: dict[str, list[PersonMessageLink]] = defaultdict(list)
+    for link in person_links:
+        by_message[link.message_id].append(link)
+
+    evidence_rows: dict[tuple[str, str, str], PersonPersonEdgeEvidenceRecord] = {}
+    pair_people: dict[str, tuple[str, str]] = {}
+    for message_id, links in by_message.items():
+        explicit = [link for link in links if link.role in {"sender", "recipient"}]
+        mentioned = [link for link in links if link.role == "mentioned"]
+
+        for idx, left in enumerate(explicit):
+            for right in explicit[idx + 1 :]:
+                if left.person_id == right.person_id:
+                    continue
+                person_a_id, person_b_id = _pair_ids(left.person_id, right.person_id)
+                pair_id = _pair_id(person_a_id, person_b_id)
+                pair_people[pair_id] = (person_a_id, person_b_id)
+                row = PersonPersonEdgeEvidenceRecord(
+                    pair_evidence_id=_edge_id(message_id, person_a_id, person_b_id, "direct_participation"),
+                    pair_id=pair_id,
+                    evidence_family="direct_participation",
+                    source_ref=f"message:{message_id}",
+                    contribution_score=min(left.confidence, right.confidence),
+                    rank_within_pair=0,
+                    message_ref=message_id,
+                    provenance=f"explicit participants on {message_id}",
+                )
+                evidence_rows[(pair_id, message_id, row.evidence_family)] = row
+
+        for explicit_link in explicit:
+            for mentioned_link in mentioned:
+                if explicit_link.person_id == mentioned_link.person_id:
+                    continue
+                person_a_id, person_b_id = _pair_ids(explicit_link.person_id, mentioned_link.person_id)
+                pair_id = _pair_id(person_a_id, person_b_id)
+                pair_people[pair_id] = (person_a_id, person_b_id)
+                row = PersonPersonEdgeEvidenceRecord(
+                    pair_evidence_id=_edge_id(message_id, person_a_id, person_b_id, "message_mention"),
+                    pair_id=pair_id,
+                    evidence_family="message_mention",
+                    source_ref=f"message:{message_id}",
+                    contribution_score=min(explicit_link.confidence, mentioned_link.confidence),
+                    rank_within_pair=0,
+                    message_ref=message_id,
+                    provenance=f"explicit participant mentioned another person on {message_id}",
+                )
+                evidence_rows[(pair_id, message_id, row.evidence_family)] = row
+
+    ordered_evidence = sorted(
+        evidence_rows.values(),
+        key=lambda row: (row.pair_id, -row.contribution_score, row.message_ref, row.evidence_family),
+    )
+    ranked_evidence: list[PersonPersonEdgeEvidenceRecord] = []
+    rank_by_pair: dict[str, int] = defaultdict(int)
+    for row in ordered_evidence:
+        rank_by_pair[row.pair_id] += 1
+        ranked_evidence.append(
+            PersonPersonEdgeEvidenceRecord(
+                pair_evidence_id=row.pair_evidence_id,
+                pair_id=row.pair_id,
+                evidence_family=row.evidence_family,
+                source_ref=row.source_ref,
+                contribution_score=row.contribution_score,
+                rank_within_pair=rank_by_pair[row.pair_id],
+                message_ref=row.message_ref,
+                theme_refs=row.theme_refs,
+                provenance=row.provenance,
+            )
+        )
+
+    grouped: dict[str, list[PersonPersonEdgeEvidenceRecord]] = defaultdict(list)
+    for row in ranked_evidence:
+        grouped[row.pair_id].append(row)
+
+    summaries: list[PersonPersonEdgeRecord] = []
+    for pair_id, rows in grouped.items():
+        person_a_id, person_b_id = pair_people[pair_id]
+        strongest = max(rows, key=lambda row: (row.contribution_score, -row.rank_within_pair))
+        direct_count = sum(1 for row in rows if row.evidence_family == "direct_participation")
+        indirect_count = sum(1 for row in rows if row.evidence_family != "direct_participation")
+        summaries.append(
+            PersonPersonEdgeRecord(
+                pair_id=pair_id,
+                person_a_id=person_a_id,
+                person_b_id=person_b_id,
+                run_id=run_id,
+                generation_scope=generation_scope,
+                strength_score=max(row.contribution_score for row in rows),
+                relationship_signal=strongest.evidence_family,
+                direct_evidence_count=direct_count,
+                indirect_evidence_count=indirect_count,
+                strongest_evidence_ref=strongest.source_ref,
+                is_current=True,
+            )
+        )
+
+    return (
+        tuple(sorted(summaries, key=lambda row: (row.person_a_id, row.person_b_id))),
+        tuple(ranked_evidence),
+    )

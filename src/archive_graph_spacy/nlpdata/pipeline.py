@@ -4,15 +4,41 @@ from __future__ import annotations
 
 import json
 import time
+from collections import defaultdict
 from pathlib import Path
 
 from .contracts import TABLE_CONTRACTS
 from .models import PipelineResult, SourceBundle
-from .person_links import derive_candidate_assertions, derive_person_links
+from .person_links import apply_reviewed_feedback, derive_candidate_assertions, derive_person_links
 from .runs import build_refresh_run, meets_runtime_goal, new_run_id, utc_now
 from .search_docs import build_search_documents
 from .source_loader import load_source_bundle
 from .themes import derive_theme_tags
+from archive_graph_spacy.edges.person_person import build_nlpdata_person_person_outputs
+
+
+def _rebuild_candidate_summary(
+    original_summary: object,
+    *,
+    candidate_assertions: tuple,
+    reviewed_effects: tuple,
+):
+    candidate_counts: dict[str, int] = defaultdict(int)
+    for candidate in candidate_assertions:
+        candidate_counts[candidate.assertion_type] += 1
+    reviewed_effect_counts: dict[str, int] = defaultdict(int)
+    for effect in reviewed_effects:
+        reviewed_effect_counts[effect.result] += 1
+    return original_summary.__class__(
+        run_id=original_summary.run_id,
+        generation_scope=original_summary.generation_scope,
+        emitted_candidate_count=len(candidate_assertions),
+        candidate_counts_by_type=dict(candidate_counts),
+        suppressed_counts=original_summary.suppressed_counts,
+        example_candidate_ids=tuple(candidate.candidate_assertion_id for candidate in candidate_assertions[:5]),
+        generated_at=original_summary.generated_at,
+        reviewed_effect_counts=dict(reviewed_effect_counts),
+    )
 
 
 def run_pipeline(
@@ -32,8 +58,29 @@ def run_pipeline(
         run_id,
         run_scope,
     )
+    candidate_assertions, reviewed_effects, reviewed_links = apply_reviewed_feedback(
+        run_id=run_id,
+        contacts=bundle.contacts,
+        candidate_assertions=candidate_assertions,
+        reviewed_assertions=bundle.reviewed_assertions,
+        review_assertion_decisions=bundle.review_assertion_decisions,
+    )
+    link_index = {(link.message_id, link.person_id, link.role): link for link in person_links}
+    for link in reviewed_links:
+        link_index[(link.message_id, link.person_id, link.role)] = link
+    person_links = tuple(link_index.values())
+    candidate_summary = _rebuild_candidate_summary(
+        candidate_summary,
+        candidate_assertions=candidate_assertions,
+        reviewed_effects=reviewed_effects,
+    )
     theme_tags, theme_suppressed = derive_theme_tags(bundle.messages, run_id)
     search_docs, search_suppressed = build_search_documents(bundle.messages, person_links, theme_tags, run_id)
+    person_person_edges, person_person_edge_evidence = build_nlpdata_person_person_outputs(
+        person_links,
+        run_id=run_id,
+        generation_scope=run_scope,
+    )
 
     duration_seconds = time.perf_counter() - started_timer
     completed_at = utc_now()
@@ -41,6 +88,9 @@ def run_pipeline(
         "message_mentions": len(mentions),
         "message_person_links": len(person_links),
         "candidate_assertions": len(candidate_assertions),
+        "reviewed_effects": len(reviewed_effects),
+        "person_person_edges": len(person_person_edges),
+        "person_person_edge_evidence": len(person_person_edge_evidence),
         "message_theme_tags": len(theme_tags),
         "message_search_docs": len(search_docs),
     }
@@ -68,8 +118,11 @@ def run_pipeline(
         person_links=person_links,
         candidate_assertions=candidate_assertions,
         candidate_summary=candidate_summary,
+        reviewed_effects=reviewed_effects,
         theme_tags=theme_tags,
         search_docs=search_docs,
+        person_person_edges=person_person_edges,
+        person_person_edge_evidence=person_person_edge_evidence,
         suppressed_counts={
             key: value
             for key, value in quality_metrics.items()
@@ -89,6 +142,9 @@ def build_pipeline_payload(export_dir: str | Path) -> dict[str, object]:
         "message_theme_tags": [row.to_record() for row in result.theme_tags],
         "message_search_docs": [row.to_record() for row in result.search_docs],
         "candidate_assertions_summary": result.candidate_summary.to_record(),
+        "reviewed_effects": [row.to_record() for row in result.reviewed_effects],
+        "person_person_edges": [row.to_record() for row in result.person_person_edges],
+        "person_person_edge_evidence": [row.to_record() for row in result.person_person_edge_evidence],
     }
 
 

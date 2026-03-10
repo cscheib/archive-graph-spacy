@@ -22,6 +22,7 @@ and treat it as the authoritative workflow definition for:
 
 - first-wave assertion types `relay_sender_identity` and
   `person_link_disambiguation`
+- later shared-family expansion such as `relationship_evidence_review`
 - review decision states `queued`, `accepted`, `rejected`, and `superseded`
 - durable accepted reviewed assertions as a state distinct from canonical
   overrides
@@ -29,8 +30,12 @@ and treat it as the authoritative workflow definition for:
   `derived_only`
 - explicit human action as a requirement for every promotion to canonical
   override
+- semantic replay matching that tolerates bounded mention-identifier drift
+  without broad fuzzy matching
+- reviewed-effect diagnostics for applied, suppressed, skipped, conflicted, and
+  ignored replay outcomes
 - exact field-level contracts for candidate review display, review decision
-  capture, and promotion handoff
+  capture, downstream replay, and promotion handoff
 
 ## Consequences
 
@@ -44,6 +49,9 @@ Positive:
   (`candidate_assertions.jsonl`) plus one diagnostics summary
   (`candidate_assertions_summary.json`) without conflating candidate outputs
   with reviewed storage
+- reruns can consume reviewed outcomes read-only and surface explicit
+  `reviewed_effects` diagnostics without mutating canonical `graph-data`
+  tables
 - downstream review and override workflows have one contract to reference for
   ownership, state transitions, and required fields
 - reviewed history remains durable without silently rewriting canonical truth

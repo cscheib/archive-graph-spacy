@@ -98,6 +98,8 @@ the change.
 - Local JSONL-derived outputs under `data_exports/<bundle>/derived/nlpdata/` plus run-scoped diagnostics summaries in the same derived area (004-candidate-assertions)
 - Python 3.12 for local pipeline, deployment, and validation code + Existing `archive_graph_spacy.nlpdata` deploy/pipeline modules, Databricks SQL client helpers, pytest, `uv` (005-nlpdata-publish-hardening)
 - Local JSONL-derived outputs plus Databricks Delta tables in `personal_archive_dev.nlpdata` (005-nlpdata-publish-hardening)
+- Python 3.12 for local pipeline, deployment, and validation code + Existing `archive_graph_spacy.nlpdata` pipeline/deploy modules, `archive_graph_spacy.edges`, Databricks SQL client helpers, pytest, `uv` (006-feedback-relationship-outputs)
+- Local JSONL-derived outputs plus Databricks Delta tables in `personal_archive_dev.nlpdata`; reviewed inputs read from `personal_archive_dev.memory` (006-feedback-relationship-outputs)
 
 ## Recent Changes
 - 001-nlpdata-schema: Added the local `nlpdata` pipeline, builder CLI, run metadata, and message-level search workspace contracts

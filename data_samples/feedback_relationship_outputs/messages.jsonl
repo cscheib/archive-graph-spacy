@@ -1,0 +1,6 @@
+{"message_id":"m-relay-bob","source":"email","sender":"relay+bob@relay.example.com","recipients":[],"subject":"Intro","body":"Bob Example can help with the handoff.","interaction_type":"email"}
+{"message_id":"m-relay-alice","source":"email","sender":"relay+alice@relay.example.com","recipients":[],"subject":"Status","body":"Please follow up with Alice Example about the report.","interaction_type":"email"}
+{"message_id":"m-pair-direct","source":"email","sender":"alice@example.com","recipients":["bob@example.com"],"subject":"Trip","body":"Bob Example and Alice Example should review the travel plan together.","interaction_type":"email"}
+{"message_id":"m-pair-mention","source":"chat","sender":"alice@example.com","recipients":[],"subject":"","body":"Bob Example said the travel plan looks good.","interaction_type":"chat"}
+{"message_id":"m-ambiguous-alex","source":"chat","sender":"coordinator@example.com","recipients":[],"subject":"","body":"Alex will join the call.","interaction_type":"chat"}
+{"message_id":"m-ambiguous-jamie","source":"chat","sender":"coordinator@example.com","recipients":[],"subject":"","body":"Jamie approved the schedule.","interaction_type":"chat"}

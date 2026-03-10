@@ -52,6 +52,32 @@ def test_build_nlpdata_writes_candidate_outputs_and_summary() -> None:
     assert (derived_dir / "candidate_assertions_summary.json").exists()
 
 
+def test_build_nlpdata_writes_reviewed_and_pair_outputs_for_phase3_fixture() -> None:
+    completed = subprocess.run(
+        [
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "archive_graph_spacy.scripts.build_nlpdata",
+            "data_samples/feedback_relationship_outputs",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(completed.stdout)
+    derived_dir = Path(payload["derived_dir"])
+
+    assert payload["output_row_counts"]["reviewed_effects"] >= 2
+    assert payload["output_row_counts"]["person_person_edges"] >= 1
+    assert payload["candidate_assertions_summary"]["reviewed_effect_counts"]["applied"] >= 1
+    assert (derived_dir / "reviewed_effects.jsonl").exists()
+    assert (derived_dir / "person_person_edges.jsonl").exists()
+    assert (derived_dir / "person_person_edge_evidence.jsonl").exists()
+
+
 def test_main_surfaces_publish_diagnostics_when_deploying(monkeypatch, capsys, tmp_path: Path) -> None:
     sample_dir = tmp_path / "sample"
     sample_dir.mkdir()

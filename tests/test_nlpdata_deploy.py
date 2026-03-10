@@ -74,6 +74,57 @@ def _write_payload_fixture(tmp_path: Path, run_id: str = "run-123") -> None:
         + "\n",
         encoding="utf-8",
     )
+    (tmp_path / "reviewed_effects.jsonl").write_text(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "candidate_assertion_id": "ca-001",
+                "assertion_type": "relay_sender_identity",
+                "subject_canonical_id": "m-001",
+                "result": "applied",
+                "reason_code": "accepted_review",
+                "details": "accepted reviewed input applied downstream effect",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "person_person_edges.jsonl").write_text(
+        json.dumps(
+            {
+                "pair_id": "pair-001",
+                "person_a_id": "p-001",
+                "person_b_id": "p-002",
+                "run_id": run_id,
+                "generation_scope": "sample-scope",
+                "strength_score": 1.0,
+                "relationship_signal": "direct_participation",
+                "direct_evidence_count": 1,
+                "indirect_evidence_count": 0,
+                "strongest_evidence_ref": "message:m-001",
+                "is_current": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "person_person_edge_evidence.jsonl").write_text(
+        json.dumps(
+            {
+                "pair_evidence_id": "ppe-001",
+                "pair_id": "pair-001",
+                "evidence_family": "direct_participation",
+                "source_ref": "message:m-001",
+                "contribution_score": 1.0,
+                "rank_within_pair": 1,
+                "message_ref": "m-001",
+                "theme_refs": [],
+                "provenance": "explicit participants on m-001",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     (tmp_path / "message_theme_tags.jsonl").write_text(
         json.dumps(
             {
@@ -178,7 +229,9 @@ def test_deploy_staged_payload_creates_schema_and_merges_current_tables(monkeypa
     assert result["publish_diagnostics"]["publish_outcome"] == "finalized"
     assert any("CREATE SCHEMA IF NOT EXISTS `personal_archive_dev`.`nlpdata`" in stmt for stmt in sql_client.statements)
     assert any("CREATE TABLE IF NOT EXISTS `personal_archive_dev`.`nlpdata`.message_search_docs" in stmt for stmt in sql_client.statements)
+    assert any("CREATE TABLE IF NOT EXISTS `personal_archive_dev`.`nlpdata`.person_person_edges" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`message_person_links`" in stmt for stmt in sql_client.statements)
+    assert any("UPDATE `personal_archive_dev`.`nlpdata`.`person_person_edges`" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`message_theme_tags`" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`message_search_docs`" in stmt for stmt in sql_client.statements)
     assert any("INSERT INTO `personal_archive_dev`.`nlpdata`.nlp_runs" in stmt for stmt in sql_client.statements)
