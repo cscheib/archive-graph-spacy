@@ -1,6 +1,9 @@
 import json
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
+from archive_graph_spacy.models import Contact, Message
+from archive_graph_spacy.nlpdata.models import SourceBundle
 from archive_graph_spacy.nlpdata.pipeline import build_pipeline_payload, run_pipeline
 from archive_graph_spacy.nlpdata.source_loader import load_source_bundle
 
@@ -179,3 +182,59 @@ def test_phase_output_files_round_trip_jsonl_shape(tmp_path: Path) -> None:
 
     assert rows
     assert {"phase_id", "pair_id", "activity_score"}.issubset(rows[0])
+
+
+def test_phase_segmentation_normalizes_mixed_timezone_timestamps() -> None:
+    contacts = (
+        Contact(person_id="p-alice", display_name="Alice", emails=("alice@example.com",), entity_type="person"),
+        Contact(person_id="p-bob", display_name="Bob", emails=("bob@example.com",), entity_type="person"),
+    )
+    messages = (
+        Message(
+            message_id="m-1",
+            source="email",
+            sender="alice@example.com",
+            recipients=("bob@example.com",),
+            subject="First",
+            body="One",
+            timestamp=datetime(2024, 1, 1, 12, 0, tzinfo=timezone(timedelta(hours=-5))),
+        ),
+        Message(
+            message_id="m-2",
+            source="email",
+            sender="bob@example.com",
+            recipients=("alice@example.com",),
+            subject="Second",
+            body="Two",
+            timestamp=datetime(2024, 1, 1, 17, 30),
+        ),
+        Message(
+            message_id="m-3",
+            source="email",
+            sender="alice@example.com",
+            recipients=("bob@example.com",),
+            subject="Third",
+            body="Three",
+            timestamp=datetime(2024, 3, 1, 9, 0, tzinfo=UTC),
+        ),
+        Message(
+            message_id="m-4",
+            source="email",
+            sender="bob@example.com",
+            recipients=("alice@example.com",),
+            subject="Fourth",
+            body="Four",
+            timestamp=datetime(2024, 3, 1, 10, 0),
+        ),
+    )
+
+    result = run_pipeline(
+        SourceBundle(contacts=contacts, messages=messages),
+        run_scope="mixed-timezone",
+    )
+
+    assert [row.phase_index for row in result.phases] == [1, 2]
+    assert result.phases[0].start_at == "2024-01-01T12:00:00-05:00"
+    assert result.phases[0].end_at == "2024-01-01T17:30:00"
+    assert result.phases[1].start_at == "2024-03-01T09:00:00+00:00"
+    assert any(row.result == "retained" for row in result.phase_diagnostics if row.diagnostic_type == "boundary")

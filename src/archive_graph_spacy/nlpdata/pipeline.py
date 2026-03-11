@@ -6,6 +6,7 @@ import hashlib
 import json
 import time
 from collections import defaultdict
+from datetime import UTC, datetime
 from pathlib import Path
 
 from archive_graph_spacy.edges.person_person import build_nlpdata_person_person_outputs
@@ -89,10 +90,17 @@ def _rebuild_candidate_summary(
 
 
 def _sorted_messages_with_timestamps(messages: tuple[Message, ...]) -> tuple[Message, ...]:
+    def _normalized_timestamp(message: Message) -> datetime:
+        assert message.timestamp is not None
+        timestamp = message.timestamp
+        if timestamp.tzinfo is None:
+            return timestamp.replace(tzinfo=UTC)
+        return timestamp.astimezone(UTC)
+
     return tuple(
         sorted(
             (message for message in messages if message.timestamp is not None),
-            key=lambda message: (message.timestamp.isoformat(), message.message_id),
+            key=lambda message: (_normalized_timestamp(message), message.message_id),
         )
     )
 
@@ -145,7 +153,9 @@ def _derive_phase_outputs(
     retained_count = 0
     for index, (left, right) in enumerate(zip(sorted_messages, sorted_messages[1:]), start=1):
         assert left.timestamp is not None and right.timestamp is not None
-        gap_days = (right.timestamp - left.timestamp).total_seconds() / 86400
+        left_ts = left.timestamp.replace(tzinfo=UTC) if left.timestamp.tzinfo is None else left.timestamp.astimezone(UTC)
+        right_ts = right.timestamp.replace(tzinfo=UTC) if right.timestamp.tzinfo is None else right.timestamp.astimezone(UTC)
+        gap_days = (right_ts - left_ts).total_seconds() / 86400
         if gap_days >= RETAIN_BOUNDARY_DAYS:
             retained_boundary_indexes.add(index)
             retained_count += 1

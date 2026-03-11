@@ -9,6 +9,7 @@ from datetime import timezone, datetime
 from dataclasses import dataclass
 from typing import Sequence
 
+from archive_graph_spacy.edges.person_person import canonical_pair_id
 from archive_graph_spacy.link.person import link_mentions_to_people
 from archive_graph_spacy.models import Contact, LinkCandidate, Mention, Message
 
@@ -58,13 +59,6 @@ def _candidate_id(assertion_type: str, subject_canonical_id: str, proposed_claim
         f"{assertion_type}|{subject_canonical_id}|{proposed_claim}|{generation_scope}".encode("utf-8")
     ).hexdigest()[:12]
     return f"ca-{digest}"
-
-
-def _canonical_pair_id(person_a_id: str, person_b_id: str) -> str:
-    readable_pair_id = "|".join(sorted((person_a_id, person_b_id)))
-    digest = hashlib.sha1(readable_pair_id.encode("utf-8")).hexdigest()[:12]
-    return f"pair-{digest}"
-
 
 def _generated_at() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -205,7 +199,7 @@ def _relationship_evidence_candidate(
     evidence_refs: tuple[str, ...],
 ) -> CandidateAssertion:
     readable_pair_id = "|".join(sorted((person_a_id, person_b_id)))
-    pair_canonical_id = _canonical_pair_id(person_a_id, person_b_id)
+    pair_canonical_id = canonical_pair_id(person_a_id, person_b_id)
     proposed_claim = (
         f"pair {readable_pair_id} has conflicting relationship evidence "
         f"(direct={direct_count}, indirect={indirect_count})"
