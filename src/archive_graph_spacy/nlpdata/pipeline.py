@@ -91,19 +91,22 @@ def _rebuild_candidate_summary(
 
 
 def _sorted_messages_with_timestamps(messages: tuple[Message, ...]) -> tuple[Message, ...]:
-    def _normalized_timestamp(message: Message) -> datetime:
-        assert message.timestamp is not None
-        timestamp = message.timestamp
-        if timestamp.tzinfo is None:
-            return timestamp.replace(tzinfo=UTC)
-        return timestamp.astimezone(UTC)
-
     return tuple(
         sorted(
             (message for message in messages if message.timestamp is not None),
-            key=lambda message: (_normalized_timestamp(message), message.message_id),
+            key=lambda message: (_normalized_timestamp(message.timestamp), message.message_id),
         )
     )
+
+
+def _normalized_timestamp(timestamp: datetime) -> datetime:
+    if timestamp.tzinfo is None:
+        return timestamp.replace(tzinfo=UTC)
+    return timestamp.astimezone(UTC)
+
+
+def _normalized_timestamp_string(timestamp: datetime) -> str:
+    return _normalized_timestamp(timestamp).isoformat()
 
 
 def _derive_phase_outputs(
@@ -155,8 +158,8 @@ def _derive_phase_outputs(
     retained_count = 0
     for index, (left, right) in enumerate(zip(sorted_messages, sorted_messages[1:]), start=1):
         assert left.timestamp is not None and right.timestamp is not None
-        left_ts = left.timestamp.replace(tzinfo=UTC) if left.timestamp.tzinfo is None else left.timestamp.astimezone(UTC)
-        right_ts = right.timestamp.replace(tzinfo=UTC) if right.timestamp.tzinfo is None else right.timestamp.astimezone(UTC)
+        left_ts = _normalized_timestamp(left.timestamp)
+        right_ts = _normalized_timestamp(right.timestamp)
         gap_days = (right_ts - left_ts).total_seconds() / 86400
         if gap_days >= RETAIN_BOUNDARY_DAYS:
             retained_boundary_indexes.add(index)
@@ -249,8 +252,8 @@ def _derive_phase_outputs(
                 run_id=run_id,
                 generation_scope=generation_scope,
                 phase_index=len(phases) + 1,
-                start_at=segment[0].timestamp.isoformat(),
-                end_at=segment[-1].timestamp.isoformat(),
+                start_at=_normalized_timestamp_string(segment[0].timestamp),
+                end_at=_normalized_timestamp_string(segment[-1].timestamp),
                 interaction_count=len(segment),
                 representative_interaction_ref=f"message:{representative.message_id}",
                 boundary_reason="time_gap_segmentation",
