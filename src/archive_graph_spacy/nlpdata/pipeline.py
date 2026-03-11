@@ -238,7 +238,7 @@ def _derive_phase_outputs(
             (
                 (
                     len(link_by_message.get(message.message_id, ())) + len(theme_by_message.get(message.message_id, ())),
-                    message.timestamp.isoformat() if message.timestamp else "",
+                    _normalized_timestamp_string(message.timestamp) if message.timestamp else "",
                     message,
                 )
                 for message in segment

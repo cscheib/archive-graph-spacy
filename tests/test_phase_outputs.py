@@ -242,6 +242,8 @@ def test_phase_segmentation_normalizes_mixed_timezone_timestamps() -> None:
     assert result.phases[0].end_at == "2024-01-01T17:30:00+00:00"
     assert result.phases[1].start_at == "2024-03-01T09:00:00+00:00"
     assert result.phases[1].end_at == "2024-03-01T10:00:00+00:00"
+    first_phase_reps = [row for row in result.phase_representative_interactions if row.phase_id == result.phases[0].phase_id]
+    assert [row.interaction_ref for row in first_phase_reps[:2]] == ["message:m-1", "message:m-2"]
     assert any(row.result == "retained" for row in result.phase_diagnostics if row.diagnostic_type == "boundary")
 
 
