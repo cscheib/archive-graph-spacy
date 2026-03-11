@@ -23,6 +23,12 @@ DEFAULT_SCHEMA = "nlpdata"
 CURRENT_STATE_TABLES = {
     "message_person_links",
     "person_person_edges",
+    "phases",
+    "phase_central_people",
+    "phase_theme_summaries",
+    "phase_pair_summaries",
+    "phase_pair_evidence",
+    "phase_representative_interactions",
     "message_theme_tags",
     "message_search_docs",
 }
@@ -30,8 +36,31 @@ CURRENT_STATE_TABLES = {
 CURRENT_STATE_IDENTITY_COLUMNS = {
     "message_person_links": "message_id",
     "person_person_edges": "pair_id",
+    "phases": "phase_id",
+    "phase_central_people": "phase_id",
+    "phase_theme_summaries": "phase_id",
+    "phase_pair_summaries": "phase_id",
+    "phase_pair_evidence": "phase_id",
+    "phase_representative_interactions": "phase_id",
     "message_theme_tags": "message_id",
     "message_search_docs": "message_id",
+}
+
+PHASE_SCOPE_TABLES = {
+    "phases",
+    "phase_central_people",
+    "phase_theme_summaries",
+    "phase_pair_summaries",
+    "phase_pair_evidence",
+    "phase_representative_interactions",
+}
+
+FINALIZATION_REFERENCE_TABLES = {
+    "phase_central_people": "phases",
+    "phase_theme_summaries": "phases",
+    "phase_pair_summaries": "phases",
+    "phase_pair_evidence": "phases",
+    "phase_representative_interactions": "phases",
 }
 
 TABLE_DDLS: dict[str, str] = {
@@ -116,6 +145,94 @@ CREATE TABLE IF NOT EXISTS {catalog}.{schema}.person_person_edge_evidence (
   message_ref STRING,
   theme_refs ARRAY<STRING>,
   provenance STRING
+) USING DELTA
+""".strip(),
+    "phases": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.phases (
+  phase_id STRING,
+  run_id STRING,
+  generation_scope STRING,
+  phase_index INT,
+  start_at TIMESTAMP,
+  end_at TIMESTAMP,
+  interaction_count BIGINT,
+  representative_interaction_ref STRING,
+  boundary_reason STRING,
+  is_current BOOLEAN
+) USING DELTA
+""".strip(),
+    "phase_central_people": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.phase_central_people (
+  phase_id STRING,
+  run_id STRING,
+  person_id STRING,
+  rank INT,
+  centrality_score DOUBLE,
+  interaction_count BIGINT,
+  evidence_ref STRING,
+  is_current BOOLEAN
+) USING DELTA
+""".strip(),
+    "phase_theme_summaries": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.phase_theme_summaries (
+  phase_id STRING,
+  run_id STRING,
+  theme STRING,
+  rank INT,
+  theme_score DOUBLE,
+  message_count BIGINT,
+  evidence_ref STRING,
+  is_current BOOLEAN
+) USING DELTA
+""".strip(),
+    "phase_pair_summaries": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.phase_pair_summaries (
+  phase_pair_id STRING,
+  phase_id STRING,
+  pair_id STRING,
+  run_id STRING,
+  pair_rank INT,
+  activity_score DOUBLE,
+  relationship_signal STRING,
+  evidence_count BIGINT,
+  strongest_evidence_ref STRING,
+  is_current BOOLEAN
+) USING DELTA
+""".strip(),
+    "phase_pair_evidence": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.phase_pair_evidence (
+  phase_pair_evidence_id STRING,
+  phase_pair_id STRING,
+  phase_id STRING,
+  pair_id STRING,
+  run_id STRING,
+  source_ref STRING,
+  message_ref STRING,
+  evidence_family STRING,
+  rank_within_phase_pair INT,
+  contribution_score DOUBLE,
+  is_current BOOLEAN
+) USING DELTA
+""".strip(),
+    "phase_representative_interactions": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.phase_representative_interactions (
+  phase_id STRING,
+  run_id STRING,
+  interaction_ref STRING,
+  rank INT,
+  selection_reason STRING,
+  is_current BOOLEAN
+) USING DELTA
+""".strip(),
+    "phase_diagnostics": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.phase_diagnostics (
+  run_id STRING,
+  phase_id STRING,
+  diagnostic_type STRING,
+  result STRING,
+  reason_code STRING,
+  sample_ref STRING,
+  details STRING
 ) USING DELTA
 """.strip(),
     "message_theme_tags": """
@@ -222,6 +339,80 @@ TABLE_COLUMN_TYPES: dict[str, dict[str, str]] = {
         "message_ref": "STRING",
         "theme_refs": "ARRAY<STRING>",
         "provenance": "STRING",
+    },
+    "phases": {
+        "phase_id": "STRING",
+        "run_id": "STRING",
+        "generation_scope": "STRING",
+        "phase_index": "INT",
+        "start_at": "TIMESTAMP",
+        "end_at": "TIMESTAMP",
+        "interaction_count": "BIGINT",
+        "representative_interaction_ref": "STRING",
+        "boundary_reason": "STRING",
+        "is_current": "BOOLEAN",
+    },
+    "phase_central_people": {
+        "phase_id": "STRING",
+        "run_id": "STRING",
+        "person_id": "STRING",
+        "rank": "INT",
+        "centrality_score": "DOUBLE",
+        "interaction_count": "BIGINT",
+        "evidence_ref": "STRING",
+        "is_current": "BOOLEAN",
+    },
+    "phase_theme_summaries": {
+        "phase_id": "STRING",
+        "run_id": "STRING",
+        "theme": "STRING",
+        "rank": "INT",
+        "theme_score": "DOUBLE",
+        "message_count": "BIGINT",
+        "evidence_ref": "STRING",
+        "is_current": "BOOLEAN",
+    },
+    "phase_pair_summaries": {
+        "phase_pair_id": "STRING",
+        "phase_id": "STRING",
+        "pair_id": "STRING",
+        "run_id": "STRING",
+        "pair_rank": "INT",
+        "activity_score": "DOUBLE",
+        "relationship_signal": "STRING",
+        "evidence_count": "BIGINT",
+        "strongest_evidence_ref": "STRING",
+        "is_current": "BOOLEAN",
+    },
+    "phase_pair_evidence": {
+        "phase_pair_evidence_id": "STRING",
+        "phase_pair_id": "STRING",
+        "phase_id": "STRING",
+        "pair_id": "STRING",
+        "run_id": "STRING",
+        "source_ref": "STRING",
+        "message_ref": "STRING",
+        "evidence_family": "STRING",
+        "rank_within_phase_pair": "INT",
+        "contribution_score": "DOUBLE",
+        "is_current": "BOOLEAN",
+    },
+    "phase_representative_interactions": {
+        "phase_id": "STRING",
+        "run_id": "STRING",
+        "interaction_ref": "STRING",
+        "rank": "INT",
+        "selection_reason": "STRING",
+        "is_current": "BOOLEAN",
+    },
+    "phase_diagnostics": {
+        "run_id": "STRING",
+        "phase_id": "STRING",
+        "diagnostic_type": "STRING",
+        "result": "STRING",
+        "reason_code": "STRING",
+        "sample_ref": "STRING",
+        "details": "STRING",
     },
     "message_theme_tags": {
         "theme_tag_id": "STRING",
@@ -342,6 +533,101 @@ SELECT
   provenance
 FROM read_files({remote_path}, format => 'json')
 """.strip(),
+    "phases": """
+INSERT INTO {catalog}.{schema}.phases
+SELECT
+  phase_id,
+  run_id,
+  generation_scope,
+  CAST(phase_index AS INT),
+  CAST(start_at AS TIMESTAMP),
+  CAST(end_at AS TIMESTAMP),
+  CAST(interaction_count AS BIGINT),
+  representative_interaction_ref,
+  boundary_reason,
+  CAST(is_current AS BOOLEAN)
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
+    "phase_central_people": """
+INSERT INTO {catalog}.{schema}.phase_central_people
+SELECT
+  phase_id,
+  run_id,
+  person_id,
+  CAST(rank AS INT),
+  CAST(centrality_score AS DOUBLE),
+  CAST(interaction_count AS BIGINT),
+  evidence_ref,
+  CAST(is_current AS BOOLEAN)
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
+    "phase_theme_summaries": """
+INSERT INTO {catalog}.{schema}.phase_theme_summaries
+SELECT
+  phase_id,
+  run_id,
+  theme,
+  CAST(rank AS INT),
+  CAST(theme_score AS DOUBLE),
+  CAST(message_count AS BIGINT),
+  evidence_ref,
+  CAST(is_current AS BOOLEAN)
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
+    "phase_pair_summaries": """
+INSERT INTO {catalog}.{schema}.phase_pair_summaries
+SELECT
+  phase_pair_id,
+  phase_id,
+  pair_id,
+  run_id,
+  CAST(pair_rank AS INT),
+  CAST(activity_score AS DOUBLE),
+  relationship_signal,
+  CAST(evidence_count AS BIGINT),
+  strongest_evidence_ref,
+  CAST(is_current AS BOOLEAN)
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
+    "phase_pair_evidence": """
+INSERT INTO {catalog}.{schema}.phase_pair_evidence
+SELECT
+  phase_pair_evidence_id,
+  phase_pair_id,
+  phase_id,
+  pair_id,
+  run_id,
+  source_ref,
+  message_ref,
+  evidence_family,
+  CAST(rank_within_phase_pair AS INT),
+  CAST(contribution_score AS DOUBLE),
+  CAST(is_current AS BOOLEAN)
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
+    "phase_representative_interactions": """
+INSERT INTO {catalog}.{schema}.phase_representative_interactions
+SELECT
+  phase_id,
+  run_id,
+  interaction_ref,
+  CAST(rank AS INT),
+  selection_reason,
+  CAST(is_current AS BOOLEAN)
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
+    "phase_diagnostics": """
+INSERT INTO {catalog}.{schema}.phase_diagnostics
+SELECT
+  run_id,
+  phase_id,
+  diagnostic_type,
+  result,
+  reason_code,
+  sample_ref,
+  details
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
     "message_theme_tags": """
 INSERT INTO {catalog}.{schema}.message_theme_tags
 SELECT
@@ -441,7 +727,18 @@ def _show_columns_sql(catalog: str, schema: str, table_name: str) -> str:
     )
 
 
-def _deactivate_current_rows_sql(catalog: str, schema: str, table_name: str, remote_path: str) -> str:
+def _deactivate_current_rows_sql(
+    catalog: str,
+    schema: str,
+    table_name: str,
+    remote_path: str,
+    *,
+    run_scope: str | None = None,
+) -> str:
+    if table_name in PHASE_SCOPE_TABLES:
+        if not run_scope:
+            raise ValueError("run_scope is required for phase-scope finalization")
+        return _deactivate_phase_scope_rows_sql(catalog, schema, table_name, run_scope)
     identity_column = CURRENT_STATE_IDENTITY_COLUMNS[table_name]
     qualified_table = ".".join(
         (
@@ -457,6 +754,41 @@ WHERE is_current = true
   AND {quote_sql_identifier(identity_column)} IN (
     SELECT DISTINCT {quote_sql_identifier(identity_column)}
     FROM read_files({quote_sql_string_literal(remote_path)}, format => 'json')
+  )
+""".strip()
+
+
+def _deactivate_phase_scope_rows_sql(catalog: str, schema: str, table_name: str, run_scope: str) -> str:
+    qualified_table = ".".join(
+        (
+            quote_sql_identifier(catalog),
+            quote_sql_identifier(schema),
+            quote_sql_identifier(table_name),
+        )
+    )
+    qualified_phases = ".".join(
+        (
+            quote_sql_identifier(catalog),
+            quote_sql_identifier(schema),
+            quote_sql_identifier("phases"),
+        )
+    )
+    if table_name == "phases":
+        return f"""
+UPDATE {qualified_table}
+SET is_current = false
+WHERE is_current = true
+  AND generation_scope = {quote_sql_string_literal(run_scope)}
+""".strip()
+    return f"""
+UPDATE {qualified_table}
+SET is_current = false
+WHERE is_current = true
+  AND phase_id IN (
+    SELECT DISTINCT phase_id
+    FROM {qualified_phases}
+    WHERE is_current = true
+      AND generation_scope = {quote_sql_string_literal(run_scope)}
   )
 """.strip()
 
@@ -479,6 +811,11 @@ WHERE run_id = {quote_sql_string_literal(run_id)}
     FROM read_files({quote_sql_string_literal(remote_path)}, format => 'json')
   )
 """.strip()
+
+
+def _finalization_remote_path(remote_dir: str, table_name: str) -> str:
+    reference_table = FINALIZATION_REFERENCE_TABLES.get(table_name, table_name)
+    return f"{remote_dir}/{reference_table}.jsonl"
 
 
 def _update_run_diagnostics_sql(catalog: str, schema: str, run_id: str, diagnostics: dict[str, object]) -> str:
@@ -588,25 +925,44 @@ def _collect_bounded_publish_scope(
     message_ids: set[str] = set()
     identity_values: set[str] = set()
     affected_tables: list[str] = []
+    cached_rows: dict[str, list[dict[str, object]]] = {}
+    run_scope = _load_run_scope(local_dir, run_id)
+
+    def _rows_for(table_name: str) -> list[dict[str, object]]:
+        rows = cached_rows.get(table_name)
+        if rows is None:
+            rows = _load_jsonl_rows(local_dir / f"{table_name}.jsonl")
+            cached_rows[table_name] = rows
+        return rows
+
     for table_name in CURRENT_STATE_TABLES:
-        rows = _load_jsonl_rows(local_dir / f"{table_name}.jsonl")
+        rows = _rows_for(table_name)
         identity_column = CURRENT_STATE_IDENTITY_COLUMNS[table_name]
         table_identity_values = {
             str(row[identity_column])
             for row in rows
             if row.get("run_id") == run_id and row.get(identity_column)
         }
+        if not table_identity_values and table_name in FINALIZATION_REFERENCE_TABLES:
+            reference_rows = _rows_for(FINALIZATION_REFERENCE_TABLES[table_name])
+            table_identity_values = {
+                str(row[identity_column])
+                for row in reference_rows
+                if row.get("run_id") == run_id and row.get(identity_column)
+            }
         if table_identity_values:
             affected_tables.append(table_name)
             identity_values.update(f"{table_name}:{value}" for value in table_identity_values)
             if identity_column == "message_id":
                 message_ids.update(table_identity_values)
+        elif table_name in PHASE_SCOPE_TABLES and run_scope:
+            affected_tables.append(table_name)
     affected_message_ids = tuple(sorted(message_ids))
     affected_identity_values = tuple(sorted(identity_values))
     overlap_scope_ids = tuple(sorted(set(affected_message_ids) | set(affected_identity_values)))
     return BoundedPublishScope(
         run_id=run_id,
-        run_scope=_load_run_scope(local_dir, run_id),
+        run_scope=run_scope,
         affected_message_ids=affected_message_ids,
         affected_identity_values=affected_identity_values,
         affected_tables=tuple(sorted(affected_tables)),
@@ -684,10 +1040,27 @@ def deploy_staged_payload(
         )
     try:
         for table_name in publish_scope.affected_tables:
-            remote_path = f"{remote_dir}/{table_name}.jsonl"
+            deactivate_remote_path = _finalization_remote_path(remote_dir, table_name)
+            activate_remote_path = f"{remote_dir}/{table_name}.jsonl"
             publish_stage = "finalizing"
-            client.execute(_deactivate_current_rows_sql(catalog, schema, table_name, remote_path))
-            client.execute(_activate_staged_rows_sql(catalog, schema, table_name, run_id, remote_path))
+            client.execute(
+                _deactivate_current_rows_sql(
+                    catalog,
+                    schema,
+                    table_name,
+                    deactivate_remote_path,
+                    run_scope=publish_scope.run_scope,
+                )
+            )
+            client.execute(
+                _activate_staged_rows_sql(
+                    catalog,
+                    schema,
+                    table_name,
+                    run_id,
+                    activate_remote_path,
+                )
+            )
             finalized_tables.append(table_name)
         publish_stage = "finalized"
         publish_outcome = "finalized"

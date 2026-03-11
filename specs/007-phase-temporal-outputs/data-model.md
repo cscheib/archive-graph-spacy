@@ -1,0 +1,169 @@
+# Data Model: Phase and Temporal Outputs
+
+## Phase
+
+**Purpose**: Represent one inferred owner-centric temporal segment published as
+part of the Phase 4 contract.
+
+**Fields**
+- `phase_id`
+- `run_id`
+- `generation_scope`
+- `phase_index`
+- `start_at`
+- `end_at`
+- `interaction_count`
+- `representative_interaction_ref`
+- `boundary_reason`
+- `is_current`
+
+**Validation Rules**
+- `phase_id` must be stable for unchanged bounded inputs
+- One current row exists per `phase_id` within a run scope
+- `phase_index` must be deterministic and sortable
+
+## Internal Boundary Decision (non-published)
+
+**Purpose**: Describe the internal deterministic reasoning used during
+time-gap segmentation before the published contract is emitted.
+
+This is not a published Phase 4 table. Downstream consumers should use
+`Phase Diagnostics Record` for the supported contract surface.
+
+**Internal Fields**
+- `run_id`
+- boundary candidate position between adjacent messages
+- decision (`retained` or `merged`)
+- `gap_days`
+- merge-rule reason code
+
+**Validation Rules**
+- Decisions must come from time-gap segmentation plus merge rules
+- Published weak-phase behavior is exposed through `Phase Diagnostics Record`,
+  not through a separate boundary-decision table
+
+## Phase Central Person
+
+**Purpose**: Publish one ranked person aggregate that helps explain who
+defines a phase.
+
+**Fields**
+- `phase_id`
+- `person_id`
+- `rank`
+- `centrality_score`
+- `interaction_count`
+- `evidence_ref`
+
+**Validation Rules**
+- Ranking must be deterministic for unchanged bounded input
+- Every row must join to a published `phase_id`
+
+## Phase Theme Summary
+
+**Purpose**: Publish one ranked theme aggregate that helps explain what defines
+a phase.
+
+**Fields**
+- `phase_id`
+- `theme`
+- `rank`
+- `theme_score`
+- `message_count`
+- `evidence_ref`
+
+**Validation Rules**
+- Ranking must be deterministic for unchanged bounded input
+- Theme rows may be omitted when theme signal is weak, but the omission must be
+  diagnosable
+
+## Phase Pair Summary
+
+**Purpose**: Publish one phase-bounded aggregate for a canonical person pair.
+
+**Fields**
+- `phase_pair_id`
+- `phase_id`
+- `pair_id`
+- `pair_rank`
+- `activity_score`
+- `relationship_signal`
+- `evidence_count`
+- `strongest_evidence_ref`
+
+**Validation Rules**
+- `pair_id` must reuse the canonical Phase 3 pair identity
+- One current summary row exists per `phase_id` + `pair_id`
+- Summary rows must be queryable without downstream recomputation
+
+## Phase Pair Evidence
+
+**Purpose**: Publish the bounded supporting evidence for one pair within one
+phase.
+
+**Fields**
+- `phase_pair_evidence_id`
+- `phase_id`
+- `pair_id`
+- `source_ref`
+- `message_ref`
+- `evidence_family`
+- `rank_within_phase_pair`
+- `contribution_score`
+
+**Validation Rules**
+- Evidence rows must remain bounded and representative
+- Selection must be deterministic for reruns of the same bounded scope
+- Every evidence row must join back to a published phase pair summary
+
+## Phase Representative Interaction
+
+**Purpose**: Publish a bounded interaction reference that represents one phase
+for list/detail exploration and diagnostics.
+
+**Fields**
+- `phase_id`
+- `interaction_ref`
+- `rank`
+- `selection_reason`
+
+**Validation Rules**
+- At least one representative interaction should exist for every published
+  phase when qualifying evidence exists
+- Ordering must be deterministic
+
+## Phase Diagnostics Record
+
+**Purpose**: Publish bounded provenance-bearing diagnostics for phase
+retention, merge, suppression, and aggregate explanation.
+
+**Fields**
+- `run_id`
+- `phase_id`
+- `diagnostic_type`
+- `result`
+- `reason_code`
+- `sample_ref`
+- `details`
+
+**Allowed Diagnostic Types**
+- `boundary`
+- `suppression`
+- `central_people`
+- `themes`
+- `temporal_pairs`
+
+**Validation Rules**
+- Diagnostics must remain bounded and operator-readable
+- Suppressed phases must appear here even when absent from `phases`
+
+## Relationships
+
+- One `Phase` may have many `Phase Central Person` rows.
+- One `Phase` may have many `Phase Theme Summary` rows.
+- One `Phase` may have many `Phase Pair Summary` rows.
+- One `Phase Pair Summary` may have many `Phase Pair Evidence` rows.
+- One `Phase` may have many `Phase Representative Interaction` rows.
+- One `Phase` may have many `Phase Diagnostics Record` rows.
+- Internal boundary decisions feed published `Phase Diagnostics Record` rows
+  for retained, merged, and suppressed outcomes.

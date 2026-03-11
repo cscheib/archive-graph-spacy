@@ -1,0 +1,4 @@
+{"person_id":"p-alice","display_name":"Alice Example","emails":["alice@example.com"],"phones":[],"photo_url":null,"entity_type":"person"}
+{"person_id":"p-bob","display_name":"Bob Example","emails":["bob@example.com"],"phones":[],"photo_url":null,"entity_type":"person"}
+{"person_id":"p-carol","display_name":"Carol Example","emails":["carol@example.com"],"phones":[],"photo_url":null,"entity_type":"person"}
+{"person_id":"p-dave","display_name":"Dave Example","emails":["dave@example.com"],"phones":[],"photo_url":null,"entity_type":"person"}

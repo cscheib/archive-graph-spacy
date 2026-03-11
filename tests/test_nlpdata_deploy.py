@@ -125,6 +125,122 @@ def _write_payload_fixture(tmp_path: Path, run_id: str = "run-123") -> None:
         + "\n",
         encoding="utf-8",
     )
+    (tmp_path / "phases.jsonl").write_text(
+        json.dumps(
+            {
+                "phase_id": "phase-001",
+                "run_id": run_id,
+                "generation_scope": "sample-scope",
+                "phase_index": 1,
+                "start_at": "2026-03-08T00:00:00+00:00",
+                "end_at": "2026-03-08T00:01:00+00:00",
+                "interaction_count": 1,
+                "representative_interaction_ref": "message:m-001",
+                "boundary_reason": "time_gap_segmentation",
+                "is_current": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "phase_central_people.jsonl").write_text(
+        json.dumps(
+            {
+                "phase_id": "phase-001",
+                "run_id": run_id,
+                "person_id": "p-001",
+                "rank": 1,
+                "centrality_score": 2.0,
+                "interaction_count": 1,
+                "evidence_ref": "message:m-001",
+                "is_current": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "phase_theme_summaries.jsonl").write_text(
+        json.dumps(
+            {
+                "phase_id": "phase-001",
+                "run_id": run_id,
+                "theme": "travel",
+                "rank": 1,
+                "theme_score": 0.8,
+                "message_count": 1,
+                "evidence_ref": "message:m-001",
+                "is_current": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "phase_pair_summaries.jsonl").write_text(
+        json.dumps(
+            {
+                "phase_pair_id": "phase-pair-001",
+                "phase_id": "phase-001",
+                "pair_id": "pair-001",
+                "run_id": run_id,
+                "pair_rank": 1,
+                "activity_score": 1.0,
+                "relationship_signal": "direct_participation",
+                "evidence_count": 1,
+                "strongest_evidence_ref": "message:m-001",
+                "is_current": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "phase_pair_evidence.jsonl").write_text(
+        json.dumps(
+            {
+                "phase_pair_evidence_id": "phase-ppe-001",
+                "phase_pair_id": "phase-pair-001",
+                "phase_id": "phase-001",
+                "pair_id": "pair-001",
+                "run_id": run_id,
+                "source_ref": "message:m-001",
+                "message_ref": "m-001",
+                "evidence_family": "direct_participation",
+                "rank_within_phase_pair": 1,
+                "contribution_score": 1.0,
+                "is_current": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "phase_representative_interactions.jsonl").write_text(
+        json.dumps(
+            {
+                "phase_id": "phase-001",
+                "run_id": run_id,
+                "interaction_ref": "message:m-001",
+                "rank": 1,
+                "selection_reason": "top_phase_activity",
+                "is_current": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "phase_diagnostics.jsonl").write_text(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "phase_id": "phase-001",
+                "diagnostic_type": "boundary",
+                "result": "retained",
+                "reason_code": "gap_retained",
+                "sample_ref": "message:m-001",
+                "details": "retained boundary after 45 day gap",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     (tmp_path / "message_theme_tags.jsonl").write_text(
         json.dumps(
             {
@@ -230,8 +346,13 @@ def test_deploy_staged_payload_creates_schema_and_merges_current_tables(monkeypa
     assert any("CREATE SCHEMA IF NOT EXISTS `personal_archive_dev`.`nlpdata`" in stmt for stmt in sql_client.statements)
     assert any("CREATE TABLE IF NOT EXISTS `personal_archive_dev`.`nlpdata`.message_search_docs" in stmt for stmt in sql_client.statements)
     assert any("CREATE TABLE IF NOT EXISTS `personal_archive_dev`.`nlpdata`.person_person_edges" in stmt for stmt in sql_client.statements)
+    assert any("CREATE TABLE IF NOT EXISTS `personal_archive_dev`.`nlpdata`.phases" in stmt for stmt in sql_client.statements)
+    assert any("CREATE TABLE IF NOT EXISTS `personal_archive_dev`.`nlpdata`.phase_pair_summaries" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`message_person_links`" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`person_person_edges`" in stmt for stmt in sql_client.statements)
+    assert any("UPDATE `personal_archive_dev`.`nlpdata`.`phases`" in stmt for stmt in sql_client.statements)
+    assert any("UPDATE `personal_archive_dev`.`nlpdata`.`phase_pair_summaries`" in stmt for stmt in sql_client.statements)
+    assert any("UPDATE `personal_archive_dev`.`nlpdata`.`phase_pair_evidence`" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`message_theme_tags`" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`message_search_docs`" in stmt for stmt in sql_client.statements)
     assert any("INSERT INTO `personal_archive_dev`.`nlpdata`.nlp_runs" in stmt for stmt in sql_client.statements)
@@ -240,6 +361,22 @@ def test_deploy_staged_payload_creates_schema_and_merges_current_tables(monkeypa
     activate_index = max(i for i, stmt in enumerate(sql_client.statements) if "SET is_current = true" in stmt and "`message_person_links`" in stmt)
     assert insert_index < deactivate_index < activate_index
     assert "false" in sql_client.statements[insert_index]
+    assert any(
+        "UPDATE `personal_archive_dev`.`nlpdata`.`phases`" in stmt
+        and "generation_scope = 'sample-scope'" in stmt
+        for stmt in sql_client.statements
+    )
+    assert any(
+        "UPDATE `personal_archive_dev`.`nlpdata`.`phase_pair_summaries`" in stmt
+        and "FROM `personal_archive_dev`.`nlpdata`.`phases`" in stmt
+        and "generation_scope = 'sample-scope'" in stmt
+        for stmt in sql_client.statements
+    )
+    assert any(
+        "INSERT INTO `personal_archive_dev`.`nlpdata`.phase_pair_evidence" in stmt
+        and "\n  run_id,\n" in stmt
+        for stmt in sql_client.statements
+    )
 
 
 def test_collect_bounded_publish_scope_tracks_non_message_identity_values(tmp_path: Path) -> None:
@@ -255,6 +392,82 @@ def test_collect_bounded_publish_scope_tracks_non_message_identity_values(tmp_pa
 
     assert "person_person_edges:pair-001" in scope.affected_identity_values
     assert "m-001" in scope.affected_message_ids
+
+
+def test_phase_child_tables_finalize_against_phases_when_child_payload_is_empty(monkeypatch, tmp_path: Path) -> None:
+    _write_payload_fixture(tmp_path)
+    (tmp_path / "phase_central_people.jsonl").write_text("", encoding="utf-8")
+
+    sql_client = FakeSqlClient()
+
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.get_workspace_client",
+        lambda profile=None: object(),
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.DatabricksSqlClient",
+        lambda workspace_client, warehouse_id: sql_client,
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.stage_payload_directory",
+        lambda local_dir, run_id, profile=None: "dbfs:/tmp/archive_graph_spacy/nlpdata/run-123",
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.cleanup_staged_directory",
+        lambda remote_dir, profile=None: None,
+    )
+
+    deploy_staged_payload(tmp_path, run_id="run-123")
+
+    assert any(
+        "UPDATE `personal_archive_dev`.`nlpdata`.`phase_central_people`" in stmt
+        and "generation_scope = 'sample-scope'" in stmt
+        for stmt in sql_client.statements
+    )
+    assert any(
+        "UPDATE `personal_archive_dev`.`nlpdata`.`phase_central_people`" in stmt
+        and "read_files('dbfs:/tmp/archive_graph_spacy/nlpdata/run-123/phase_central_people.jsonl'" in stmt
+        for stmt in sql_client.statements
+    )
+
+
+def test_phase_scope_finalization_uses_run_scope_when_phase_payload_is_empty(
+    monkeypatch, tmp_path: Path
+) -> None:
+    _write_payload_fixture(tmp_path)
+    (tmp_path / "phases.jsonl").write_text("", encoding="utf-8")
+
+    sql_client = FakeSqlClient()
+
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.get_workspace_client",
+        lambda profile=None: object(),
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.DatabricksSqlClient",
+        lambda workspace_client, warehouse_id: sql_client,
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.stage_payload_directory",
+        lambda local_dir, run_id, profile=None: "dbfs:/tmp/archive_graph_spacy/nlpdata/run-123",
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.cleanup_staged_directory",
+        lambda remote_dir, profile=None: None,
+    )
+
+    deploy_staged_payload(tmp_path, run_id="run-123")
+
+    assert any(
+        "UPDATE `personal_archive_dev`.`nlpdata`.`phases`" in stmt
+        and "generation_scope = 'sample-scope'" in stmt
+        for stmt in sql_client.statements
+    )
+    assert any(
+        "UPDATE `personal_archive_dev`.`nlpdata`.`phase_central_people`" in stmt
+        and "generation_scope = 'sample-scope'" in stmt
+        for stmt in sql_client.statements
+    )
 
 
 def test_deploy_staged_payload_adds_missing_contract_columns(monkeypatch, tmp_path: Path) -> None:

@@ -19,6 +19,12 @@ def _pair_ids(left: str, right: str) -> tuple[str, str]:
     return tuple(sorted((left, right)))
 
 
+def canonical_pair_id(left: str, right: str) -> str:
+    person_a_id, person_b_id = _pair_ids(left, right)
+    digest = hashlib.sha1(f"{person_a_id}|{person_b_id}".encode("utf-8")).hexdigest()[:12]
+    return f"pair-{digest}"
+
+
 def _edge_id(*parts: str) -> str:
     digest = hashlib.sha1("|".join(parts).encode("utf-8")).hexdigest()
     return f"pp-{digest[:12]}"
@@ -128,12 +134,6 @@ def aggregate_person_person_edges(
 
     return sorted(aggregated, key=lambda row: (row.person_a_id, row.person_b_id))
 
-
-def _pair_id(person_a_id: str, person_b_id: str) -> str:
-    digest = hashlib.sha1(f"{person_a_id}|{person_b_id}".encode("utf-8")).hexdigest()[:12]
-    return f"pair-{digest}"
-
-
 def build_nlpdata_person_person_outputs(
     person_links: tuple[PersonMessageLink, ...],
     *,
@@ -155,7 +155,7 @@ def build_nlpdata_person_person_outputs(
                 if left.person_id == right.person_id:
                     continue
                 person_a_id, person_b_id = _pair_ids(left.person_id, right.person_id)
-                pair_id = _pair_id(person_a_id, person_b_id)
+                pair_id = canonical_pair_id(person_a_id, person_b_id)
                 pair_people[pair_id] = (person_a_id, person_b_id)
                 row = PersonPersonEdgeEvidenceRecord(
                     pair_evidence_id=_edge_id(message_id, person_a_id, person_b_id, "direct_participation"),
@@ -174,7 +174,7 @@ def build_nlpdata_person_person_outputs(
                 if explicit_link.person_id == mentioned_link.person_id:
                     continue
                 person_a_id, person_b_id = _pair_ids(explicit_link.person_id, mentioned_link.person_id)
-                pair_id = _pair_id(person_a_id, person_b_id)
+                pair_id = canonical_pair_id(person_a_id, person_b_id)
                 pair_people[pair_id] = (person_a_id, person_b_id)
                 row = PersonPersonEdgeEvidenceRecord(
                     pair_evidence_id=_edge_id(message_id, person_a_id, person_b_id, "message_mention"),

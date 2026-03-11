@@ -101,6 +101,80 @@ message_ref STRING,
 theme_refs ARRAY<STRING>,
 provenance STRING
 """.strip(),
+    "phases": """
+phase_id STRING,
+run_id STRING,
+generation_scope STRING,
+phase_index INT,
+start_at STRING,
+end_at STRING,
+interaction_count BIGINT,
+representative_interaction_ref STRING,
+boundary_reason STRING,
+is_current BOOLEAN
+""".strip(),
+    "phase_central_people": """
+phase_id STRING,
+run_id STRING,
+person_id STRING,
+rank INT,
+centrality_score DOUBLE,
+interaction_count BIGINT,
+evidence_ref STRING,
+is_current BOOLEAN
+""".strip(),
+    "phase_theme_summaries": """
+phase_id STRING,
+run_id STRING,
+theme STRING,
+rank INT,
+theme_score DOUBLE,
+message_count BIGINT,
+evidence_ref STRING,
+is_current BOOLEAN
+""".strip(),
+    "phase_pair_summaries": """
+phase_pair_id STRING,
+phase_id STRING,
+pair_id STRING,
+run_id STRING,
+pair_rank INT,
+activity_score DOUBLE,
+relationship_signal STRING,
+evidence_count BIGINT,
+strongest_evidence_ref STRING,
+is_current BOOLEAN
+""".strip(),
+    "phase_pair_evidence": """
+phase_pair_evidence_id STRING,
+phase_pair_id STRING,
+phase_id STRING,
+pair_id STRING,
+run_id STRING,
+source_ref STRING,
+message_ref STRING,
+evidence_family STRING,
+rank_within_phase_pair INT,
+contribution_score DOUBLE,
+is_current BOOLEAN
+""".strip(),
+    "phase_representative_interactions": """
+phase_id STRING,
+run_id STRING,
+interaction_ref STRING,
+rank INT,
+selection_reason STRING,
+is_current BOOLEAN
+""".strip(),
+    "phase_diagnostics": """
+run_id STRING,
+phase_id STRING,
+diagnostic_type STRING,
+result STRING,
+reason_code STRING,
+sample_ref STRING,
+details STRING
+""".strip(),
     "message_theme_tags": """
 theme_tag_id STRING,
 run_id STRING,

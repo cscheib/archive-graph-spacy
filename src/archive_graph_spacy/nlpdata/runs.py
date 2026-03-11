@@ -57,6 +57,29 @@ def build_refresh_run(
     )
 
 
+def build_phase_quality_metrics(
+    *,
+    suppressed_phase_count: int,
+    phase_boundary_merged_count: int,
+    phase_boundary_retained_count: int,
+    phase_representative_interaction_cap: int,
+    phase_pair_evidence_cap: int,
+    phase_pair_evidence_phase_cap: int,
+    phase_boundary_diagnostic_cap: int,
+    phase_diagnostics_count: int,
+) -> dict[str, int]:
+    return {
+        "suppressed_phase_count": suppressed_phase_count,
+        "phase_boundary_merged_count": phase_boundary_merged_count,
+        "phase_boundary_retained_count": phase_boundary_retained_count,
+        "phase_representative_interaction_cap": phase_representative_interaction_cap,
+        "phase_pair_evidence_cap": phase_pair_evidence_cap,
+        "phase_pair_evidence_phase_cap": phase_pair_evidence_phase_cap,
+        "phase_boundary_diagnostic_cap": phase_boundary_diagnostic_cap,
+        "phase_diagnostics_count": phase_diagnostics_count,
+    }
+
+
 def classify_scope_overlap(
     scope_message_ids: tuple[str, ...],
     active_scope_message_ids: tuple[tuple[str, ...], ...],

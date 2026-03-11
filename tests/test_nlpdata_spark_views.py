@@ -37,6 +37,24 @@ def test_spark_schema_for_message_search_docs_covers_ambiguous_columns() -> None
     assert "time_facets MAP<STRING, STRING>" in schema
 
 
+def test_spark_schema_for_phase_pair_summaries_covers_phase_outputs() -> None:
+    schema = spark_schema_for_table("phase_pair_summaries")
+
+    assert "phase_pair_id STRING" in schema
+    assert "phase_id STRING" in schema
+    assert "activity_score DOUBLE" in schema
+    assert "is_current BOOLEAN" in schema
+
+
+def test_spark_schema_for_phase_pair_evidence_includes_run_id() -> None:
+    schema = spark_schema_for_table("phase_pair_evidence")
+
+    assert "phase_pair_evidence_id STRING" in schema
+    assert "phase_id STRING" in schema
+    assert "run_id STRING" in schema
+    assert "contribution_score DOUBLE" in schema
+
+
 def test_create_temp_view_from_rows_supplies_explicit_schema() -> None:
     spark = FakeSparkSession()
     rows = [
@@ -119,6 +137,32 @@ def test_ordered_rows_for_nlp_runs_preserves_publish_diagnostics_column() -> Non
             "{\"message_mentions\": 1}",
             "{\"runtime_seconds\": 1.0}",
             "{\"publish_outcome\": \"staged\"}",
+        )
+    ]
+
+
+def test_ordered_rows_for_phase_diagnostics_preserves_phase_details() -> None:
+    rows = [
+        {
+            "run_id": "run-123",
+            "phase_id": "phase-001",
+            "diagnostic_type": "boundary",
+            "result": "retained",
+            "reason_code": "gap_retained",
+            "sample_ref": "message:m-001",
+            "details": "retained boundary after 45 day gap",
+        }
+    ]
+
+    assert ordered_rows_for_table("phase_diagnostics", rows) == [
+        (
+            "run-123",
+            "phase-001",
+            "boundary",
+            "retained",
+            "gap_retained",
+            "message:m-001",
+            "retained boundary after 45 day gap",
         )
     ]
 

@@ -1,9 +1,10 @@
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from archive_graph_spacy.nlpdata.databricks import DatabricksSqlError
-from archive_graph_spacy.nlpdata.source_loader import load_source_bundle_from_databricks
+from archive_graph_spacy.nlpdata.source_loader import load_source_bundle, load_source_bundle_from_databricks
 
 
 class FakeSqlClient:
@@ -143,3 +144,33 @@ def test_load_source_bundle_from_databricks_only_swallows_missing_review_tables(
 
     with pytest.raises(DatabricksSqlError, match="PERMISSION_DENIED"):
         load_source_bundle_from_databricks(catalog="personal_archive_dev")
+
+
+def test_load_source_bundle_does_not_read_derived_relationship_outputs(tmp_path: Path) -> None:
+    export_dir = tmp_path / "bundle"
+    export_dir.mkdir()
+    export_dir.joinpath("contacts.jsonl").write_text(
+        '{"person_id":"p-alice","display_name":"Alice Example","emails":["alice@example.com"]}\n',
+        encoding="utf-8",
+    )
+    export_dir.joinpath("messages.jsonl").write_text(
+        '{"message_id":"m-001","source":"email","sender":"alice@example.com","recipients":["bob@example.com"],'
+        '"subject":"Trip","body":"Flight hotel trip","timestamp":"2026-03-06T10:00:00","interaction_type":"email"}\n',
+        encoding="utf-8",
+    )
+    derived_dir = export_dir / "derived" / "nlpdata"
+    derived_dir.mkdir(parents=True)
+    derived_dir.joinpath("person_person_edges.jsonl").write_text(
+        '{"pair_id":"pair-stale","person_id_a":"p-alice","person_id_b":"p-bob"}\n',
+        encoding="utf-8",
+    )
+    derived_dir.joinpath("person_person_edge_evidence.jsonl").write_text(
+        '{"pair_evidence_id":"pe-1","pair_id":"pair-stale","evidence_family":"direct_participation",'
+        '"source_ref":"message:m-001","contribution_score":1.0,"rank_within_pair":1,"message_ref":"m-001"}\n',
+        encoding="utf-8",
+    )
+
+    bundle = load_source_bundle(export_dir)
+
+    assert bundle.contacts[0].person_id == "p-alice"
+    assert bundle.messages[0].message_id == "m-001"

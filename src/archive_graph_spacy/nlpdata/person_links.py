@@ -9,6 +9,7 @@ from datetime import timezone, datetime
 from dataclasses import dataclass
 from typing import Sequence
 
+from archive_graph_spacy.edges.person_person import canonical_pair_id
 from archive_graph_spacy.link.person import link_mentions_to_people
 from archive_graph_spacy.models import Contact, LinkCandidate, Mention, Message
 
@@ -58,7 +59,6 @@ def _candidate_id(assertion_type: str, subject_canonical_id: str, proposed_claim
         f"{assertion_type}|{subject_canonical_id}|{proposed_claim}|{generation_scope}".encode("utf-8")
     ).hexdigest()[:12]
     return f"ca-{digest}"
-
 
 def _generated_at() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -198,23 +198,24 @@ def _relationship_evidence_candidate(
     indirect_count: int,
     evidence_refs: tuple[str, ...],
 ) -> CandidateAssertion:
-    pair_id = "|".join(sorted((person_a_id, person_b_id)))
+    readable_pair_id = "|".join(sorted((person_a_id, person_b_id)))
+    pair_canonical_id = canonical_pair_id(person_a_id, person_b_id)
     proposed_claim = (
-        f"pair {pair_id} has conflicting relationship evidence "
+        f"pair {readable_pair_id} has conflicting relationship evidence "
         f"(direct={direct_count}, indirect={indirect_count})"
     )
     return CandidateAssertion(
         candidate_assertion_id=_candidate_id(
             "relationship_evidence_review",
-            pair_id,
+            pair_canonical_id,
             proposed_claim,
             generation_scope,
         ),
         run_id=run_id,
         assertion_type="relationship_evidence_review",
-        subject_canonical_id=pair_id,
+        subject_canonical_id=pair_canonical_id,
         proposed_claim=proposed_claim,
-        evidence_refs=evidence_refs,
+        evidence_refs=evidence_refs + (f"pair_id:{pair_canonical_id}",),
         provenance_summary=(
             "Derived from mixed direct and indirect pair evidence across the bounded run"
         ),
@@ -478,12 +479,29 @@ def _candidate_legacy_semantic_key(candidate: CandidateAssertion) -> str:
 
 
 def _reviewed_semantic_key(reviewed: dict[str, object]) -> str:
+    assertion_type = str(reviewed.get("assertion_type") or "")
+    subject_canonical_id = _normalized_reviewed_subject_canonical_id(
+        assertion_type=assertion_type,
+        subject_canonical_id=str(reviewed.get("subject_canonical_id") or ""),
+    )
     return _semantic_key_from_values(
-        str(reviewed.get("assertion_type") or ""),
-        str(reviewed.get("subject_canonical_id") or ""),
+        assertion_type,
+        subject_canonical_id,
         str(reviewed.get("proposed_claim") or ""),
         str(reviewed.get("generation_scope") or "") or None,
     )
+
+
+def _normalized_reviewed_subject_canonical_id(*, assertion_type: str, subject_canonical_id: str) -> str:
+    if (
+        assertion_type == "relationship_evidence_review"
+        and "|" in subject_canonical_id
+        and not subject_canonical_id.startswith("pair-")
+    ):
+        pair_parts = tuple(part.strip() for part in subject_canonical_id.split("|") if part.strip())
+        if len(pair_parts) == 2:
+            subject_canonical_id = canonical_pair_id(pair_parts[0], pair_parts[1])
+    return subject_canonical_id
 
 
 def _reviewed_relay_link(
@@ -554,7 +572,10 @@ def apply_reviewed_feedback(
             matched = by_legacy_semantic_key.get(
                 _semantic_key_from_values(
                     assertion_type,
-                    subject_canonical_id,
+                    _normalized_reviewed_subject_canonical_id(
+                        assertion_type=assertion_type,
+                        subject_canonical_id=subject_canonical_id,
+                    ),
                     str(reviewed.get("proposed_claim") or ""),
                 )
             )
@@ -594,7 +615,10 @@ def apply_reviewed_feedback(
                 and _candidate_legacy_semantic_key(matched)
                 == _semantic_key_from_values(
                     assertion_type,
-                    subject_canonical_id,
+                    _normalized_reviewed_subject_canonical_id(
+                        assertion_type=assertion_type,
+                        subject_canonical_id=subject_canonical_id,
+                    ),
                     str(reviewed.get("proposed_claim") or ""),
                 )
             )

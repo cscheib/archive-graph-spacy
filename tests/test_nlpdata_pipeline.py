@@ -3,6 +3,7 @@ from archive_graph_spacy.nlpdata.runs import meets_runtime_goal, semantic_replay
 from archive_graph_spacy.nlpdata.source_loader import load_source_bundle
 from archive_graph_spacy.models import Contact, Message
 from archive_graph_spacy.nlpdata.models import SourceBundle
+from archive_graph_spacy.edges.person_person import canonical_pair_id
 
 
 def test_run_pipeline_creates_current_rows() -> None:
@@ -42,6 +43,13 @@ def test_build_pipeline_payload_includes_all_contract_tables() -> None:
         "reviewed_effects",
         "person_person_edges",
         "person_person_edge_evidence",
+        "phases",
+        "phase_central_people",
+        "phase_theme_summaries",
+        "phase_pair_summaries",
+        "phase_pair_evidence",
+        "phase_representative_interactions",
+        "phase_diagnostics",
         "message_theme_tags",
         "message_search_docs",
     }
@@ -104,6 +112,44 @@ def test_run_pipeline_consumes_reviewed_feedback_and_emits_pair_outputs() -> Non
     assert any(link.link_origin == "reviewed" and link.role == "sender" for link in result.person_links)
     assert any(edge.person_a_id == "p-alice" and edge.person_b_id == "p-bob" for edge in result.person_person_edges)
     assert any(row.evidence_family == "message_mention" for row in result.person_person_edge_evidence)
+
+
+def test_run_pipeline_replays_legacy_relationship_review_subject_ids_without_generation_scope() -> None:
+    bundle = load_source_bundle("data_samples/feedback_relationship_outputs")
+    current_result = run_pipeline(bundle, run_scope="data_samples/feedback_relationship_outputs")
+    current_candidate = next(
+        candidate
+        for candidate in current_result.candidate_assertions
+        if candidate.assertion_type == "relationship_evidence_review"
+    )
+    legacy_bundle = SourceBundle(
+        contacts=bundle.contacts,
+        messages=bundle.messages,
+        reviewed_assertions=(
+            {
+                "candidate_assertion_id": "legacy-relationship-review",
+                "assertion_type": "relationship_evidence_review",
+                "subject_canonical_id": "p-alice|p-bob",
+                "proposed_claim": current_candidate.proposed_claim,
+                "current_review_state": "accepted",
+            },
+        ),
+        review_assertion_decisions=(),
+    )
+
+    result = run_pipeline(legacy_bundle, run_scope="data_samples/feedback_relationship_outputs")
+
+    assert not any(
+        candidate.assertion_type == "relationship_evidence_review"
+        and candidate.subject_canonical_id == canonical_pair_id("p-alice", "p-bob")
+        for candidate in result.candidate_assertions
+    )
+    assert any(
+        effect.assertion_type == "relationship_evidence_review"
+        and effect.result == "applied"
+        and effect.subject_canonical_id == canonical_pair_id("p-alice", "p-bob")
+        for effect in result.reviewed_effects
+    )
 
 
 def test_semantic_replay_key_tolerates_mention_identifier_drift() -> None:

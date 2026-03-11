@@ -161,6 +161,9 @@ after:
 - The UI stays explainable because published provenance-bearing outputs remain
   the source of truth for phase and graph claims.
 - Phase 5 AI work stays optional and bounded.
+- ADR 006 now fixes the first concrete upstream Phase 4 contract:
+  `phases`, phase child tables, and bounded diagnostics all live inside the
+  existing `build_nlpdata` path.
 
 ### Negative
 
