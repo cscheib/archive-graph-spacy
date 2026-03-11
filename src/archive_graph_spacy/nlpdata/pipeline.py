@@ -342,16 +342,20 @@ def _derive_phase_outputs(
             ordered_pairs.append((pair_id, sum(row.contribution_score for row in rows), rows))
         ordered_pairs.sort(key=lambda item: (-item[1], item[0]))
         emitted_phase_pair_evidence = 0
-        for rank, (pair_id, activity_score, rows) in enumerate(ordered_pairs, start=1):
+        emitted_phase_pair_summaries = 0
+        for pair_id, activity_score, rows in ordered_pairs:
+            if emitted_phase_pair_evidence >= MAX_PHASE_PAIR_EVIDENCE_PER_PHASE:
+                break
             phase_pair_id = _phase_pair_id(phase_id, pair_id)
             strongest = rows[0]
+            emitted_phase_pair_summaries += 1
             phase_pair_summaries.append(
                 PhasePairSummaryRecord(
                     phase_pair_id=phase_pair_id,
                     phase_id=phase_id,
                     pair_id=pair_id,
                     run_id=run_id,
-                    pair_rank=rank,
+                    pair_rank=emitted_phase_pair_summaries,
                     activity_score=round(activity_score, 6),
                     relationship_signal=strongest.evidence_family,
                     evidence_count=len(rows),
@@ -388,7 +392,7 @@ def _derive_phase_outputs(
                     result="retained",
                     reason_code="bounded_pair_aggregation",
                     sample_ref=f"pair:{ordered_pairs[0][0]}",
-                    details=f"published {len(ordered_pairs)} phase-bounded pair summaries",
+                    details=f"published {emitted_phase_pair_summaries} phase-bounded pair summaries",
                 )
             )
 
@@ -451,28 +455,6 @@ def run_pipeline(
         run_id=run_id,
         generation_scope=run_scope,
     )
-    if not person_person_edges and bundle.existing_person_person_edges:
-        person_person_edges = tuple(
-            PersonPersonEdgeRecord(**row)
-            for row in bundle.existing_person_person_edges
-            if isinstance(row, dict)
-        )
-    if not person_person_edge_evidence and bundle.existing_person_person_edge_evidence:
-        person_person_edge_evidence = tuple(
-            PersonPersonEdgeEvidenceRecord(
-                pair_evidence_id=str(row["pair_evidence_id"]),
-                pair_id=str(row["pair_id"]),
-                evidence_family=str(row["evidence_family"]),
-                source_ref=str(row["source_ref"]),
-                contribution_score=float(row["contribution_score"]),
-                rank_within_pair=int(row["rank_within_pair"]),
-                message_ref=str(row["message_ref"]),
-                theme_refs=tuple(str(item) for item in row.get("theme_refs", ()) or ()),
-                provenance=str(row.get("provenance") or ""),
-            )
-            for row in bundle.existing_person_person_edge_evidence
-            if isinstance(row, dict)
-        )
 
     (
         phases,

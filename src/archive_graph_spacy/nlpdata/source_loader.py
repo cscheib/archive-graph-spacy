@@ -32,17 +32,11 @@ def load_source_bundle(directory: str | Path) -> SourceBundle:
     base = Path(directory)
     reviewed_assertions = _read_optional_jsonl(base / "reviewed_assertions.jsonl")
     review_assertion_decisions = _read_optional_jsonl(base / "review_assertion_decisions.jsonl")
-    existing_person_person_edges = _read_optional_jsonl(base / "derived" / "nlpdata" / "person_person_edges.jsonl")
-    existing_person_person_edge_evidence = _read_optional_jsonl(
-        base / "derived" / "nlpdata" / "person_person_edge_evidence.jsonl"
-    )
     return SourceBundle(
         contacts=tuple(contacts),
         messages=tuple(messages),
         reviewed_assertions=tuple(reviewed_assertions),
         review_assertion_decisions=tuple(review_assertion_decisions),
-        existing_person_person_edges=tuple(existing_person_person_edges),
-        existing_person_person_edge_evidence=tuple(existing_person_person_edge_evidence),
     )
 
 

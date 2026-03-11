@@ -97,6 +97,16 @@ def test_phase_outputs_remain_bounded() -> None:
         assert len([row for row in result.phase_central_people if row.phase_id == phase_id]) <= 5
         assert len([row for row in result.phase_theme_summaries if row.phase_id == phase_id]) <= 5
         assert len([row for row in result.phase_pair_evidence if row.phase_id == phase_id]) <= 5
+        phase_pair_ids_with_evidence = {
+            row.phase_pair_id
+            for row in result.phase_pair_evidence
+            if row.phase_id == phase_id
+        }
+        assert all(
+            row.phase_pair_id in phase_pair_ids_with_evidence
+            for row in result.phase_pair_summaries
+            if row.phase_id == phase_id
+        )
     assert len(result.phase_diagnostics) <= 16
 
 
