@@ -13,7 +13,7 @@ variables:
     default: chris@scheib.io
   wheel_version:
     description: Python wheel version (matches pyproject.toml)
-    default: "0.1.0"
+    default: "0.1.1"
   wheel_path:
     description: Workspace wheel path
     default: ""
