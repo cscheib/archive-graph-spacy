@@ -182,6 +182,7 @@ def test_refresh_notebook_uses_typed_temp_view_helper() -> None:
     assert "if alter_sql is not None:" in notebook
     assert "spark.sql(alter_sql)" in notebook
     assert 'if table_name == "nlp_runs":' in notebook
+    assert '"reviewed_effects": [row.to_record() for row in result.reviewed_effects]' in notebook
     assert "CREATE OR REPLACE TEMP VIEW" in notebook
 
 
