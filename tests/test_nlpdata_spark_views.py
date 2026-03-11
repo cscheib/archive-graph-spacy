@@ -172,6 +172,10 @@ def test_refresh_notebook_uses_typed_temp_view_helper() -> None:
 
     assert "from archive_graph_spacy.nlpdata.spark_views import create_temp_view_from_rows" in notebook
     assert "from archive_graph_spacy.nlpdata.deploy import _add_missing_columns_sql, _show_columns_sql" in notebook
+    assert (
+        "from archive_graph_spacy.nlpdata.deploy import CURRENT_STATE_IDENTITY_COLUMNS, CURRENT_STATE_TABLES, TABLE_DDLS"
+        in notebook
+    )
     assert "create_temp_view_from_rows(" in notebook
     assert "spark.createDataFrame(rows).createOrReplaceTempView(temp_view)" not in notebook
     assert '"publish_diagnostics": json.dumps(result.run.publish_diagnostics)' in notebook
@@ -183,6 +187,8 @@ def test_refresh_notebook_uses_typed_temp_view_helper() -> None:
     assert "spark.sql(alter_sql)" in notebook
     assert 'if table_name == "nlp_runs":' in notebook
     assert '"reviewed_effects": [row.to_record() for row in result.reviewed_effects]' in notebook
+    assert "identity_column = CURRENT_STATE_IDENTITY_COLUMNS[table_name]" in notebook
+    assert "SELECT DISTINCT {quote_sql_identifier(identity_column)} FROM {temp_view}" in notebook
     assert "CREATE OR REPLACE TEMP VIEW" in notebook
 
 

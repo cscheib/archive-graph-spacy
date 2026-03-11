@@ -33,7 +33,7 @@ from archive_graph_spacy.nlpdata.databricks import (
     quote_sql_string_literal,
     validate_iso_date,
 )
-from archive_graph_spacy.nlpdata.deploy import CURRENT_STATE_TABLES, TABLE_DDLS
+from archive_graph_spacy.nlpdata.deploy import CURRENT_STATE_IDENTITY_COLUMNS, CURRENT_STATE_TABLES, TABLE_DDLS
 from archive_graph_spacy.nlpdata.deploy import _add_missing_columns_sql, _show_columns_sql
 from archive_graph_spacy.nlpdata.pipeline import run_pipeline
 from archive_graph_spacy.nlpdata.spark_views import create_temp_view_from_rows
@@ -192,12 +192,15 @@ for table_name, ddl in TABLE_DDLS.items():
             temp_view=temp_view,
         )
     if table_name in CURRENT_STATE_TABLES:
+        identity_column = CURRENT_STATE_IDENTITY_COLUMNS[table_name]
         spark.sql(
             f"""
             UPDATE {quoted_catalog}.{quoted_schema}.{quote_sql_identifier(table_name)}
             SET is_current = false
             WHERE is_current = true
-              AND message_id IN (SELECT DISTINCT message_id FROM {temp_view})
+              AND {quote_sql_identifier(identity_column)} IN (
+                SELECT DISTINCT {quote_sql_identifier(identity_column)} FROM {temp_view}
+              )
             """
         )
     columns = TABLE_CONTRACTS[table_name]
