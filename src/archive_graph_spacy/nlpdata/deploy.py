@@ -46,6 +46,15 @@ CURRENT_STATE_IDENTITY_COLUMNS = {
     "message_search_docs": "message_id",
 }
 
+PHASE_SCOPE_TABLES = {
+    "phases",
+    "phase_central_people",
+    "phase_theme_summaries",
+    "phase_pair_summaries",
+    "phase_pair_evidence",
+    "phase_representative_interactions",
+}
+
 FINALIZATION_REFERENCE_TABLES = {
     "phase_central_people": "phases",
     "phase_theme_summaries": "phases",
@@ -719,6 +728,8 @@ def _show_columns_sql(catalog: str, schema: str, table_name: str) -> str:
 
 
 def _deactivate_current_rows_sql(catalog: str, schema: str, table_name: str, remote_path: str) -> str:
+    if table_name in PHASE_SCOPE_TABLES:
+        return _deactivate_phase_scope_rows_sql(catalog, schema, table_name, remote_path)
     identity_column = CURRENT_STATE_IDENTITY_COLUMNS[table_name]
     qualified_table = ".".join(
         (
@@ -734,6 +745,47 @@ WHERE is_current = true
   AND {quote_sql_identifier(identity_column)} IN (
     SELECT DISTINCT {quote_sql_identifier(identity_column)}
     FROM read_files({quote_sql_string_literal(remote_path)}, format => 'json')
+  )
+""".strip()
+
+
+def _deactivate_phase_scope_rows_sql(catalog: str, schema: str, table_name: str, remote_path: str) -> str:
+    qualified_table = ".".join(
+        (
+            quote_sql_identifier(catalog),
+            quote_sql_identifier(schema),
+            quote_sql_identifier(table_name),
+        )
+    )
+    qualified_phases = ".".join(
+        (
+            quote_sql_identifier(catalog),
+            quote_sql_identifier(schema),
+            quote_sql_identifier("phases"),
+        )
+    )
+    if table_name == "phases":
+        return f"""
+UPDATE {qualified_table}
+SET is_current = false
+WHERE is_current = true
+  AND generation_scope IN (
+    SELECT DISTINCT generation_scope
+    FROM read_files({quote_sql_string_literal(remote_path)}, format => 'json')
+  )
+""".strip()
+    return f"""
+UPDATE {qualified_table}
+SET is_current = false
+WHERE is_current = true
+  AND phase_id IN (
+    SELECT DISTINCT phase_id
+    FROM {qualified_phases}
+    WHERE is_current = true
+      AND generation_scope IN (
+        SELECT DISTINCT generation_scope
+        FROM read_files({quote_sql_string_literal(remote_path)}, format => 'json')
+      )
   )
 """.strip()
 

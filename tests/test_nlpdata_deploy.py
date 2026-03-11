@@ -362,8 +362,14 @@ def test_deploy_staged_payload_creates_schema_and_merges_current_tables(monkeypa
     assert insert_index < deactivate_index < activate_index
     assert "false" in sql_client.statements[insert_index]
     assert any(
+        "UPDATE `personal_archive_dev`.`nlpdata`.`phases`" in stmt
+        and "SELECT DISTINCT generation_scope" in stmt
+        for stmt in sql_client.statements
+    )
+    assert any(
         "UPDATE `personal_archive_dev`.`nlpdata`.`phase_pair_summaries`" in stmt
-        and "SELECT DISTINCT `phase_id`" in stmt
+        and "generation_scope IN" in stmt
+        and "SELECT DISTINCT generation_scope" in stmt
         for stmt in sql_client.statements
     )
     assert any(
