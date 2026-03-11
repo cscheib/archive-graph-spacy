@@ -424,6 +424,11 @@ def test_phase_child_tables_finalize_against_phases_when_child_payload_is_empty(
         and "generation_scope = 'sample-scope'" in stmt
         for stmt in sql_client.statements
     )
+    assert any(
+        "UPDATE `personal_archive_dev`.`nlpdata`.`phase_central_people`" in stmt
+        and "read_files('dbfs:/tmp/archive_graph_spacy/nlpdata/run-123/phase_central_people.jsonl'" in stmt
+        for stmt in sql_client.statements
+    )
 
 
 def test_phase_scope_finalization_uses_run_scope_when_phase_payload_is_empty(

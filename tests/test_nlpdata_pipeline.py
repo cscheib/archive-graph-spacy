@@ -114,7 +114,7 @@ def test_run_pipeline_consumes_reviewed_feedback_and_emits_pair_outputs() -> Non
     assert any(row.evidence_family == "message_mention" for row in result.person_person_edge_evidence)
 
 
-def test_run_pipeline_replays_legacy_relationship_review_subject_ids() -> None:
+def test_run_pipeline_replays_legacy_relationship_review_subject_ids_without_generation_scope() -> None:
     bundle = load_source_bundle("data_samples/feedback_relationship_outputs")
     current_result = run_pipeline(bundle, run_scope="data_samples/feedback_relationship_outputs")
     current_candidate = next(
@@ -132,7 +132,6 @@ def test_run_pipeline_replays_legacy_relationship_review_subject_ids() -> None:
                 "subject_canonical_id": "p-alice|p-bob",
                 "proposed_claim": current_candidate.proposed_claim,
                 "current_review_state": "accepted",
-                "generation_scope": "data_samples/feedback_relationship_outputs",
             },
         ),
         review_assertion_decisions=(),

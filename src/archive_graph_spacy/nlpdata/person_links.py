@@ -480,7 +480,19 @@ def _candidate_legacy_semantic_key(candidate: CandidateAssertion) -> str:
 
 def _reviewed_semantic_key(reviewed: dict[str, object]) -> str:
     assertion_type = str(reviewed.get("assertion_type") or "")
-    subject_canonical_id = str(reviewed.get("subject_canonical_id") or "")
+    subject_canonical_id = _normalized_reviewed_subject_canonical_id(
+        assertion_type=assertion_type,
+        subject_canonical_id=str(reviewed.get("subject_canonical_id") or ""),
+    )
+    return _semantic_key_from_values(
+        assertion_type,
+        subject_canonical_id,
+        str(reviewed.get("proposed_claim") or ""),
+        str(reviewed.get("generation_scope") or "") or None,
+    )
+
+
+def _normalized_reviewed_subject_canonical_id(*, assertion_type: str, subject_canonical_id: str) -> str:
     if (
         assertion_type == "relationship_evidence_review"
         and "|" in subject_canonical_id
@@ -489,12 +501,7 @@ def _reviewed_semantic_key(reviewed: dict[str, object]) -> str:
         pair_parts = tuple(part.strip() for part in subject_canonical_id.split("|") if part.strip())
         if len(pair_parts) == 2:
             subject_canonical_id = canonical_pair_id(pair_parts[0], pair_parts[1])
-    return _semantic_key_from_values(
-        assertion_type,
-        subject_canonical_id,
-        str(reviewed.get("proposed_claim") or ""),
-        str(reviewed.get("generation_scope") or "") or None,
-    )
+    return subject_canonical_id
 
 
 def _reviewed_relay_link(
@@ -565,7 +572,10 @@ def apply_reviewed_feedback(
             matched = by_legacy_semantic_key.get(
                 _semantic_key_from_values(
                     assertion_type,
-                    subject_canonical_id,
+                    _normalized_reviewed_subject_canonical_id(
+                        assertion_type=assertion_type,
+                        subject_canonical_id=subject_canonical_id,
+                    ),
                     str(reviewed.get("proposed_claim") or ""),
                 )
             )
@@ -605,7 +615,10 @@ def apply_reviewed_feedback(
                 and _candidate_legacy_semantic_key(matched)
                 == _semantic_key_from_values(
                     assertion_type,
-                    subject_canonical_id,
+                    _normalized_reviewed_subject_canonical_id(
+                        assertion_type=assertion_type,
+                        subject_canonical_id=subject_canonical_id,
+                    ),
                     str(reviewed.get("proposed_claim") or ""),
                 )
             )

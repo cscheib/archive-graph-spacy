@@ -1040,18 +1040,27 @@ def deploy_staged_payload(
         )
     try:
         for table_name in publish_scope.affected_tables:
-            remote_path = _finalization_remote_path(remote_dir, table_name)
+            deactivate_remote_path = _finalization_remote_path(remote_dir, table_name)
+            activate_remote_path = f"{remote_dir}/{table_name}.jsonl"
             publish_stage = "finalizing"
             client.execute(
                 _deactivate_current_rows_sql(
                     catalog,
                     schema,
                     table_name,
-                    remote_path,
+                    deactivate_remote_path,
                     run_scope=publish_scope.run_scope,
                 )
             )
-            client.execute(_activate_staged_rows_sql(catalog, schema, table_name, run_id, remote_path))
+            client.execute(
+                _activate_staged_rows_sql(
+                    catalog,
+                    schema,
+                    table_name,
+                    run_id,
+                    activate_remote_path,
+                )
+            )
             finalized_tables.append(table_name)
         publish_stage = "finalized"
         publish_outcome = "finalized"
