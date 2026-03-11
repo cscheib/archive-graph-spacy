@@ -46,6 +46,14 @@ CURRENT_STATE_IDENTITY_COLUMNS = {
     "message_search_docs": "message_id",
 }
 
+FINALIZATION_REFERENCE_TABLES = {
+    "phase_central_people": "phases",
+    "phase_theme_summaries": "phases",
+    "phase_pair_summaries": "phases",
+    "phase_pair_evidence": "phases",
+    "phase_representative_interactions": "phases",
+}
+
 TABLE_DDLS: dict[str, str] = {
     "nlp_runs": """
 CREATE TABLE IF NOT EXISTS {catalog}.{schema}.nlp_runs (
@@ -750,6 +758,11 @@ WHERE run_id = {quote_sql_string_literal(run_id)}
 """.strip()
 
 
+def _finalization_remote_path(remote_dir: str, table_name: str) -> str:
+    reference_table = FINALIZATION_REFERENCE_TABLES.get(table_name, table_name)
+    return f"{remote_dir}/{reference_table}.jsonl"
+
+
 def _update_run_diagnostics_sql(catalog: str, schema: str, run_id: str, diagnostics: dict[str, object]) -> str:
     qualified_table = ".".join(
         (
@@ -857,14 +870,30 @@ def _collect_bounded_publish_scope(
     message_ids: set[str] = set()
     identity_values: set[str] = set()
     affected_tables: list[str] = []
+    cached_rows: dict[str, list[dict[str, object]]] = {}
+
+    def _rows_for(table_name: str) -> list[dict[str, object]]:
+        rows = cached_rows.get(table_name)
+        if rows is None:
+            rows = _load_jsonl_rows(local_dir / f"{table_name}.jsonl")
+            cached_rows[table_name] = rows
+        return rows
+
     for table_name in CURRENT_STATE_TABLES:
-        rows = _load_jsonl_rows(local_dir / f"{table_name}.jsonl")
+        rows = _rows_for(table_name)
         identity_column = CURRENT_STATE_IDENTITY_COLUMNS[table_name]
         table_identity_values = {
             str(row[identity_column])
             for row in rows
             if row.get("run_id") == run_id and row.get(identity_column)
         }
+        if not table_identity_values and table_name in FINALIZATION_REFERENCE_TABLES:
+            reference_rows = _rows_for(FINALIZATION_REFERENCE_TABLES[table_name])
+            table_identity_values = {
+                str(row[identity_column])
+                for row in reference_rows
+                if row.get("run_id") == run_id and row.get(identity_column)
+            }
         if table_identity_values:
             affected_tables.append(table_name)
             identity_values.update(f"{table_name}:{value}" for value in table_identity_values)
@@ -953,7 +982,7 @@ def deploy_staged_payload(
         )
     try:
         for table_name in publish_scope.affected_tables:
-            remote_path = f"{remote_dir}/{table_name}.jsonl"
+            remote_path = _finalization_remote_path(remote_dir, table_name)
             publish_stage = "finalizing"
             client.execute(_deactivate_current_rows_sql(catalog, schema, table_name, remote_path))
             client.execute(_activate_staged_rows_sql(catalog, schema, table_name, run_id, remote_path))

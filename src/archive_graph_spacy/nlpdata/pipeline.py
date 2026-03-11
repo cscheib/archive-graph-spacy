@@ -14,6 +14,8 @@ from archive_graph_spacy.models import Message
 
 from .contracts import TABLE_CONTRACTS
 from .models import (
+    CandidateDiagnosticsSummary,
+    CandidateAssertion,
     PhaseCentralPersonRecord,
     PhaseDiagnosticsRecord,
     PhasePairEvidenceRecord,
@@ -25,6 +27,7 @@ from .models import (
     PersonMessageLink,
     PersonPersonEdgeEvidenceRecord,
     PersonPersonEdgeRecord,
+    ReviewedEffectResult,
     SourceBundle,
     ThemeTag,
 )
@@ -67,11 +70,11 @@ def _phase_pair_evidence_id(phase_pair_id: str, source_ref: str, evidence_family
 
 
 def _rebuild_candidate_summary(
-    original_summary: object,
+    original_summary: CandidateDiagnosticsSummary,
     *,
-    candidate_assertions: tuple,
-    reviewed_effects: tuple,
-) -> object:
+    candidate_assertions: tuple[CandidateAssertion, ...],
+    reviewed_effects: tuple[ReviewedEffectResult, ...],
+) -> CandidateDiagnosticsSummary:
     candidate_counts: dict[str, int] = defaultdict(int)
     for candidate in candidate_assertions:
         candidate_counts[candidate.assertion_type] += 1
