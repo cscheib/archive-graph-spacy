@@ -48,6 +48,7 @@ MAX_CENTRAL_PEOPLE_PER_PHASE = 5
 MAX_THEME_SUMMARIES_PER_PHASE = 5
 MAX_PHASE_PAIR_EVIDENCE_PER_PAIR = 5
 MAX_PHASE_PAIR_EVIDENCE_PER_PHASE = 5
+MAX_BOUNDARY_DIAGNOSTICS = 12
 
 
 def _phase_id(generation_scope: str, message_ids: tuple[str, ...]) -> str:
@@ -133,6 +134,7 @@ def _derive_phase_outputs(
             "phase_representative_interaction_cap": MAX_REPRESENTATIVE_INTERACTIONS_PER_PHASE,
             "phase_pair_evidence_cap": MAX_PHASE_PAIR_EVIDENCE_PER_PAIR,
             "phase_pair_evidence_phase_cap": MAX_PHASE_PAIR_EVIDENCE_PER_PHASE,
+            "phase_boundary_diagnostic_cap": MAX_BOUNDARY_DIAGNOSTICS,
         }
 
     link_by_message: dict[str, list[PersonMessageLink]] = defaultdict(list)
@@ -186,7 +188,12 @@ def _derive_phase_outputs(
         boundary_phase_id = previous_published_phase_id or phase_id
         for message in segment:
             boundary_phase_ids[message.message_id] = boundary_phase_id
-    for result, gap_days, right_message_id in boundary_candidates:
+    bounded_boundary_candidates = sorted(
+        boundary_candidates,
+        key=lambda item: item[1],
+        reverse=True,
+    )[:MAX_BOUNDARY_DIAGNOSTICS]
+    for result, gap_days, right_message_id in bounded_boundary_candidates:
         diagnostics.append(
             PhaseDiagnosticsRecord(
                 run_id=run_id,
@@ -421,6 +428,7 @@ def _derive_phase_outputs(
             "phase_representative_interaction_cap": MAX_REPRESENTATIVE_INTERACTIONS_PER_PHASE,
             "phase_pair_evidence_cap": MAX_PHASE_PAIR_EVIDENCE_PER_PAIR,
             "phase_pair_evidence_phase_cap": MAX_PHASE_PAIR_EVIDENCE_PER_PHASE,
+            "phase_boundary_diagnostic_cap": MAX_BOUNDARY_DIAGNOSTICS,
         },
     )
 
@@ -516,6 +524,7 @@ def run_pipeline(
             phase_representative_interaction_cap=int(phase_metrics["phase_representative_interaction_cap"]),
             phase_pair_evidence_cap=int(phase_metrics["phase_pair_evidence_cap"]),
             phase_pair_evidence_phase_cap=int(phase_metrics["phase_pair_evidence_phase_cap"]),
+            phase_boundary_diagnostic_cap=int(phase_metrics["phase_boundary_diagnostic_cap"]),
             phase_diagnostics_count=len(phase_diagnostics),
         ),
         "runtime_seconds": round(duration_seconds, 6),

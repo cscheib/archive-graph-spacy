@@ -130,8 +130,6 @@ def source_bundle_from_rows(
     message_rows: list[dict[str, object]],
     reviewed_assertion_rows: list[dict[str, object]] | None = None,
     review_assertion_decision_rows: list[dict[str, object]] | None = None,
-    existing_person_person_edge_rows: list[dict[str, object]] | None = None,
-    existing_person_person_edge_evidence_rows: list[dict[str, object]] | None = None,
 ) -> SourceBundle:
     contacts = tuple(
         _contact_from_row(row)
@@ -144,8 +142,6 @@ def source_bundle_from_rows(
         messages=messages,
         reviewed_assertions=tuple(reviewed_assertion_rows or []),
         review_assertion_decisions=tuple(review_assertion_decision_rows or []),
-        existing_person_person_edges=tuple(existing_person_person_edge_rows or []),
-        existing_person_person_edge_evidence=tuple(existing_person_person_edge_evidence_rows or []),
     )
 
 

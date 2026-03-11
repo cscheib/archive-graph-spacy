@@ -22,29 +22,25 @@ part of the Phase 4 contract.
 - One current row exists per `phase_id` within a run scope
 - `phase_index` must be deterministic and sortable
 
-## Phase Boundary Decision
+## Internal Boundary Decision (non-published)
 
-**Purpose**: Represent the deterministic reasoning used to retain, merge, or
-suppress a temporal segment boundary.
+**Purpose**: Describe the internal deterministic reasoning used during
+time-gap segmentation before the published contract is emitted.
 
-**Fields**
+This is not a published Phase 4 table. Downstream consumers should use
+`Phase Diagnostics Record` for the supported contract surface.
+
+**Internal Fields**
 - `run_id`
-- `candidate_boundary_id`
-- `phase_id_before`
-- `phase_id_after`
-- `decision`
+- boundary candidate position between adjacent messages
+- decision (`retained` or `merged`)
 - `gap_days`
-- `merge_rule`
-- `reason_code`
-
-**Allowed Decisions**
-- `retained`
-- `merged`
-- `suppressed`
+- merge-rule reason code
 
 **Validation Rules**
-- Decision must come from time-gap segmentation plus merge rules
-- `suppressed` boundaries must not create published weak phases
+- Decisions must come from time-gap segmentation plus merge rules
+- Published weak-phase behavior is exposed through `Phase Diagnostics Record`,
+  not through a separate boundary-decision table
 
 ## Phase Central Person
 
@@ -169,5 +165,5 @@ retention, merge, suppression, and aggregate explanation.
 - One `Phase Pair Summary` may have many `Phase Pair Evidence` rows.
 - One `Phase` may have many `Phase Representative Interaction` rows.
 - One `Phase` may have many `Phase Diagnostics Record` rows.
-- One `Phase Boundary Decision` may explain the transition between two adjacent
-  published phases or the suppression of a weak segment.
+- Internal boundary decisions feed published `Phase Diagnostics Record` rows
+  for retained, merged, and suppressed outcomes.

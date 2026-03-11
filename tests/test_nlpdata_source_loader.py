@@ -174,5 +174,3 @@ def test_load_source_bundle_does_not_read_derived_relationship_outputs(tmp_path:
 
     assert bundle.contacts[0].person_id == "p-alice"
     assert bundle.messages[0].message_id == "m-001"
-    assert bundle.existing_person_person_edges == ()
-    assert bundle.existing_person_person_edge_evidence == ()

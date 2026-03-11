@@ -14,8 +14,6 @@ class SourceBundle:
     messages: tuple[Message, ...]
     reviewed_assertions: tuple[dict[str, object], ...] = ()
     review_assertion_decisions: tuple[dict[str, object], ...] = ()
-    existing_person_person_edges: tuple[dict[str, object], ...] = ()
-    existing_person_person_edge_evidence: tuple[dict[str, object], ...] = ()
 
 
 @dataclass(frozen=True)

@@ -65,6 +65,7 @@ def build_phase_quality_metrics(
     phase_representative_interaction_cap: int,
     phase_pair_evidence_cap: int,
     phase_pair_evidence_phase_cap: int,
+    phase_boundary_diagnostic_cap: int,
     phase_diagnostics_count: int,
 ) -> dict[str, int]:
     return {
@@ -74,6 +75,7 @@ def build_phase_quality_metrics(
         "phase_representative_interaction_cap": phase_representative_interaction_cap,
         "phase_pair_evidence_cap": phase_pair_evidence_cap,
         "phase_pair_evidence_phase_cap": phase_pair_evidence_phase_cap,
+        "phase_boundary_diagnostic_cap": phase_boundary_diagnostic_cap,
         "phase_diagnostics_count": phase_diagnostics_count,
     }
 

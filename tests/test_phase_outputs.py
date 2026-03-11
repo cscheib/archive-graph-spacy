@@ -4,7 +4,11 @@ from pathlib import Path
 
 from archive_graph_spacy.models import Contact, Message
 from archive_graph_spacy.nlpdata.models import SourceBundle
-from archive_graph_spacy.nlpdata.pipeline import build_pipeline_payload, run_pipeline
+from archive_graph_spacy.nlpdata.pipeline import (
+    MAX_BOUNDARY_DIAGNOSTICS,
+    build_pipeline_payload,
+    run_pipeline,
+)
 from archive_graph_spacy.nlpdata.source_loader import load_source_bundle
 
 
@@ -238,3 +242,35 @@ def test_phase_segmentation_normalizes_mixed_timezone_timestamps() -> None:
     assert result.phases[0].end_at == "2024-01-01T17:30:00"
     assert result.phases[1].start_at == "2024-03-01T09:00:00+00:00"
     assert any(row.result == "retained" for row in result.phase_diagnostics if row.diagnostic_type == "boundary")
+
+
+def test_phase_boundary_diagnostics_are_explicitly_bounded() -> None:
+    contacts = (
+        Contact(person_id="p-alice", display_name="Alice", emails=("alice@example.com",), entity_type="person"),
+        Contact(person_id="p-bob", display_name="Bob", emails=("bob@example.com",), entity_type="person"),
+    )
+    messages = tuple(
+        Message(
+            message_id=f"m-{index}",
+            source="email",
+            sender="alice@example.com" if index % 2 else "bob@example.com",
+            recipients=("bob@example.com",) if index % 2 else ("alice@example.com",),
+            subject=f"Message {index}",
+            body="Gap-heavy phase fixture",
+            timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC) + timedelta(days=index * 16),
+        )
+        for index in range(MAX_BOUNDARY_DIAGNOSTICS + 5)
+    )
+
+    result = run_pipeline(
+        SourceBundle(contacts=contacts, messages=messages),
+        run_scope="many-boundaries",
+    )
+
+    boundary_rows = [row for row in result.phase_diagnostics if row.diagnostic_type == "boundary"]
+
+    assert len(boundary_rows) == MAX_BOUNDARY_DIAGNOSTICS
+    assert all(row.result == "merged" for row in boundary_rows)
+    assert result.run.quality_metrics["phase_boundary_merged_count"] == len(messages) - 1
+    assert result.run.quality_metrics["phase_boundary_retained_count"] == 0
+    assert result.run.quality_metrics["phase_boundary_diagnostic_cap"] == MAX_BOUNDARY_DIAGNOSTICS
