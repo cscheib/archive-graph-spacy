@@ -727,9 +727,18 @@ def _show_columns_sql(catalog: str, schema: str, table_name: str) -> str:
     )
 
 
-def _deactivate_current_rows_sql(catalog: str, schema: str, table_name: str, remote_path: str) -> str:
+def _deactivate_current_rows_sql(
+    catalog: str,
+    schema: str,
+    table_name: str,
+    remote_path: str,
+    *,
+    run_scope: str | None = None,
+) -> str:
     if table_name in PHASE_SCOPE_TABLES:
-        return _deactivate_phase_scope_rows_sql(catalog, schema, table_name, remote_path)
+        if not run_scope:
+            raise ValueError("run_scope is required for phase-scope finalization")
+        return _deactivate_phase_scope_rows_sql(catalog, schema, table_name, run_scope)
     identity_column = CURRENT_STATE_IDENTITY_COLUMNS[table_name]
     qualified_table = ".".join(
         (
@@ -749,7 +758,7 @@ WHERE is_current = true
 """.strip()
 
 
-def _deactivate_phase_scope_rows_sql(catalog: str, schema: str, table_name: str, remote_path: str) -> str:
+def _deactivate_phase_scope_rows_sql(catalog: str, schema: str, table_name: str, run_scope: str) -> str:
     qualified_table = ".".join(
         (
             quote_sql_identifier(catalog),
@@ -769,10 +778,7 @@ def _deactivate_phase_scope_rows_sql(catalog: str, schema: str, table_name: str,
 UPDATE {qualified_table}
 SET is_current = false
 WHERE is_current = true
-  AND generation_scope IN (
-    SELECT DISTINCT generation_scope
-    FROM read_files({quote_sql_string_literal(remote_path)}, format => 'json')
-  )
+  AND generation_scope = {quote_sql_string_literal(run_scope)}
 """.strip()
     return f"""
 UPDATE {qualified_table}
@@ -782,10 +788,7 @@ WHERE is_current = true
     SELECT DISTINCT phase_id
     FROM {qualified_phases}
     WHERE is_current = true
-      AND generation_scope IN (
-        SELECT DISTINCT generation_scope
-        FROM read_files({quote_sql_string_literal(remote_path)}, format => 'json')
-      )
+      AND generation_scope = {quote_sql_string_literal(run_scope)}
   )
 """.strip()
 
@@ -923,6 +926,7 @@ def _collect_bounded_publish_scope(
     identity_values: set[str] = set()
     affected_tables: list[str] = []
     cached_rows: dict[str, list[dict[str, object]]] = {}
+    run_scope = _load_run_scope(local_dir, run_id)
 
     def _rows_for(table_name: str) -> list[dict[str, object]]:
         rows = cached_rows.get(table_name)
@@ -951,12 +955,14 @@ def _collect_bounded_publish_scope(
             identity_values.update(f"{table_name}:{value}" for value in table_identity_values)
             if identity_column == "message_id":
                 message_ids.update(table_identity_values)
+        elif table_name in PHASE_SCOPE_TABLES and run_scope:
+            affected_tables.append(table_name)
     affected_message_ids = tuple(sorted(message_ids))
     affected_identity_values = tuple(sorted(identity_values))
     overlap_scope_ids = tuple(sorted(set(affected_message_ids) | set(affected_identity_values)))
     return BoundedPublishScope(
         run_id=run_id,
-        run_scope=_load_run_scope(local_dir, run_id),
+        run_scope=run_scope,
         affected_message_ids=affected_message_ids,
         affected_identity_values=affected_identity_values,
         affected_tables=tuple(sorted(affected_tables)),
@@ -1036,7 +1042,15 @@ def deploy_staged_payload(
         for table_name in publish_scope.affected_tables:
             remote_path = _finalization_remote_path(remote_dir, table_name)
             publish_stage = "finalizing"
-            client.execute(_deactivate_current_rows_sql(catalog, schema, table_name, remote_path))
+            client.execute(
+                _deactivate_current_rows_sql(
+                    catalog,
+                    schema,
+                    table_name,
+                    remote_path,
+                    run_scope=publish_scope.run_scope,
+                )
+            )
             client.execute(_activate_staged_rows_sql(catalog, schema, table_name, run_id, remote_path))
             finalized_tables.append(table_name)
         publish_stage = "finalized"

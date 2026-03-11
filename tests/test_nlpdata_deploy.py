@@ -363,13 +363,13 @@ def test_deploy_staged_payload_creates_schema_and_merges_current_tables(monkeypa
     assert "false" in sql_client.statements[insert_index]
     assert any(
         "UPDATE `personal_archive_dev`.`nlpdata`.`phases`" in stmt
-        and "SELECT DISTINCT generation_scope" in stmt
+        and "generation_scope = 'sample-scope'" in stmt
         for stmt in sql_client.statements
     )
     assert any(
         "UPDATE `personal_archive_dev`.`nlpdata`.`phase_pair_summaries`" in stmt
-        and "generation_scope IN" in stmt
-        and "SELECT DISTINCT generation_scope" in stmt
+        and "FROM `personal_archive_dev`.`nlpdata`.`phases`" in stmt
+        and "generation_scope = 'sample-scope'" in stmt
         for stmt in sql_client.statements
     )
     assert any(
@@ -421,7 +421,46 @@ def test_phase_child_tables_finalize_against_phases_when_child_payload_is_empty(
 
     assert any(
         "UPDATE `personal_archive_dev`.`nlpdata`.`phase_central_people`" in stmt
-        and "read_files('dbfs:/tmp/archive_graph_spacy/nlpdata/run-123/phases.jsonl'" in stmt
+        and "generation_scope = 'sample-scope'" in stmt
+        for stmt in sql_client.statements
+    )
+
+
+def test_phase_scope_finalization_uses_run_scope_when_phase_payload_is_empty(
+    monkeypatch, tmp_path: Path
+) -> None:
+    _write_payload_fixture(tmp_path)
+    (tmp_path / "phases.jsonl").write_text("", encoding="utf-8")
+
+    sql_client = FakeSqlClient()
+
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.get_workspace_client",
+        lambda profile=None: object(),
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.DatabricksSqlClient",
+        lambda workspace_client, warehouse_id: sql_client,
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.stage_payload_directory",
+        lambda local_dir, run_id, profile=None: "dbfs:/tmp/archive_graph_spacy/nlpdata/run-123",
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.cleanup_staged_directory",
+        lambda remote_dir, profile=None: None,
+    )
+
+    deploy_staged_payload(tmp_path, run_id="run-123")
+
+    assert any(
+        "UPDATE `personal_archive_dev`.`nlpdata`.`phases`" in stmt
+        and "generation_scope = 'sample-scope'" in stmt
+        for stmt in sql_client.statements
+    )
+    assert any(
+        "UPDATE `personal_archive_dev`.`nlpdata`.`phase_central_people`" in stmt
+        and "generation_scope = 'sample-scope'" in stmt
         for stmt in sql_client.statements
     )
 
