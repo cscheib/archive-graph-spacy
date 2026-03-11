@@ -479,9 +479,19 @@ def _candidate_legacy_semantic_key(candidate: CandidateAssertion) -> str:
 
 
 def _reviewed_semantic_key(reviewed: dict[str, object]) -> str:
+    assertion_type = str(reviewed.get("assertion_type") or "")
+    subject_canonical_id = str(reviewed.get("subject_canonical_id") or "")
+    if (
+        assertion_type == "relationship_evidence_review"
+        and "|" in subject_canonical_id
+        and not subject_canonical_id.startswith("pair-")
+    ):
+        pair_parts = tuple(part.strip() for part in subject_canonical_id.split("|") if part.strip())
+        if len(pair_parts) == 2:
+            subject_canonical_id = canonical_pair_id(pair_parts[0], pair_parts[1])
     return _semantic_key_from_values(
-        str(reviewed.get("assertion_type") or ""),
-        str(reviewed.get("subject_canonical_id") or ""),
+        assertion_type,
+        subject_canonical_id,
         str(reviewed.get("proposed_claim") or ""),
         str(reviewed.get("generation_scope") or "") or None,
     )
