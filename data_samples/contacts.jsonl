@@ -1,0 +1,2 @@
+{"person_id":"p-alice","display_name":"Alice Example","emails":["alice@example.com"],"phones":["+15550001001"],"photo_url":null,"entity_type":"person"}
+{"person_id":"p-bob","display_name":"Bob Example","emails":["bob@example.com"],"phones":["+15550001002"],"photo_url":null,"entity_type":"person"}

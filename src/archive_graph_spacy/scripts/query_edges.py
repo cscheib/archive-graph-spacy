@@ -41,6 +41,28 @@ PRESET_QUERIES = {
 }
 
 
+def _top_mentions_query(owner_person_id: str | None, owner_mode: str) -> str:
+    filters = [
+        "role = 'mentioned'",
+        "person_type = 'person'",
+    ]
+    if owner_person_id and owner_mode == "hide":
+        filters.append("person_id != ?")
+
+    order_by = "mention_edges DESC, person_name"
+    if owner_person_id and owner_mode == "downrank":
+        order_by = "CASE WHEN person_id = ? THEN 1 ELSE 0 END ASC, " + order_by
+
+    return f"""
+        SELECT person_name, person_id, COUNT(*) AS mention_edges
+        FROM read_json_auto(?)
+        WHERE {" AND ".join(filters)}
+        GROUP BY person_name, person_id
+        ORDER BY {order_by}
+        LIMIT 20
+    """
+
+
 def _top_pairs_query(owner_person_id: str | None, owner_mode: str) -> str:
     filters = [
         "person_a_type = 'person'",
@@ -80,6 +102,13 @@ def _query_sql_and_params(
     owner_mode: str,
 ) -> tuple[str, list[str]]:
     params: list[str] = [str(table_path)]
+    if query_name == "top_mentions":
+        if owner_person_id and owner_mode == "hide":
+            params.extend([owner_person_id])
+        if owner_person_id and owner_mode == "downrank":
+            params.extend([owner_person_id])
+        return _top_mentions_query(owner_person_id, owner_mode), params
+
     if query_name != "top_pairs":
         return PRESET_QUERIES[query_name], params
 

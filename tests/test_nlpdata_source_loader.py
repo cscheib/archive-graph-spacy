@@ -92,8 +92,10 @@ def test_load_source_bundle_from_databricks_maps_rows(monkeypatch) -> None:
     assert bundle.review_assertion_decisions[0]["decision_state"] == "accepted"
     assert any("LIMIT 100" in query for query in fake_client.queries)
     assert any("LIMIT 200" in query for query in fake_client.queries)
-    assert any("assertion_type IN ('relay_sender_identity', 'person_link_disambiguation')" in query for query in fake_client.queries)
+    assert any("assertion_type IN ('relay_sender_identity', 'person_link_disambiguation', 'relationship_evidence_review')" in query for query in fake_client.queries)
     assert any("subject_canonical_id IN ('m-001')" in query for query in fake_client.queries)
+    assert any("COALESCE(i.body, i.preview, i.subject) IS NOT NULL" in query for query in fake_client.queries)
+    assert any("EXISTS(evidence_refs, ref -> ref IN ('direct_message:m-001', 'indirect_message:m-001', 'message:m-001'))" in query for query in fake_client.queries)
 
 
 def test_load_source_bundle_from_databricks_rejects_invalid_catalog(monkeypatch) -> None:

@@ -118,7 +118,12 @@ def main() -> int:
     if args.source == "bundle":
         result = build_nlpdata_from_bundle(export_dir)
     else:
-        output_dir = Path(args.output_dir) if args.output_dir else export_dir
+        if args.output_dir:
+            output_dir = Path(args.output_dir)
+        else:
+            raise SystemExit(
+                "error: --output-dir is required when --source databricks is used"
+            )
         result = build_nlpdata_from_databricks(
             output_dir=output_dir,
             catalog=args.catalog,
@@ -142,6 +147,10 @@ def main() -> int:
         result["deployment"] = deployment
         result["publish_diagnostics"] = deployment["publish_diagnostics"]
     print(json.dumps(result, indent=2))
+    if args.deploy:
+        outcome = (result.get("publish_diagnostics") or {}).get("publish_outcome", "")
+        if outcome in ("partial", "failed"):
+            return 1
     return 0
 
 

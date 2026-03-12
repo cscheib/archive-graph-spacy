@@ -24,6 +24,10 @@ DEFAULT_INTERACTION_TYPES = (
 SUPPORTED_REVIEWED_ASSERTION_TYPES = (
     "relay_sender_identity",
     "person_link_disambiguation",
+    "relationship_evidence_review",
+)
+PAIR_SCOPED_ASSERTION_TYPES = (
+    "relationship_evidence_review",
 )
 
 
@@ -53,6 +57,24 @@ def _read_optional_jsonl(path: Path) -> list[dict[str, object]]:
 
 def _quote_sql_string(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
+
+
+def _message_ids_from_rows(rows: list[dict[str, object]]) -> tuple[str, ...]:
+    return tuple(str(row["message_id"]) for row in rows if row.get("message_id"))
+
+
+def _pair_scoped_message_ref_predicate(message_ids: tuple[str, ...]) -> str:
+    if not message_ids:
+        return "FALSE"
+    ref_checks = ", ".join(
+        _quote_sql_string(prefix + message_id)
+        for message_id in message_ids
+        for prefix in ("direct_message:", "indirect_message:", "message:")
+    )
+    return (
+        f"(assertion_type IN ({', '.join(_quote_sql_string(value) for value in PAIR_SCOPED_ASSERTION_TYPES)}) "
+        f"AND EXISTS(evidence_refs, ref -> ref IN ({ref_checks})))"
+    )
 
 
 def _is_missing_table_error(exc: DatabricksSqlError) -> bool:
@@ -162,7 +184,7 @@ def load_source_bundle_from_databricks(
 
     predicates = [
         f"i.interaction_type IN ({quoted_types})",
-        "COALESCE(i.preview, i.subject) IS NOT NULL",
+        "COALESCE(i.body, i.preview, i.subject) IS NOT NULL",
     ]
     if start_date:
         predicates.append(f"i.timestamp >= {_quote_sql_string(start_date)}")
@@ -178,7 +200,7 @@ def load_source_bundle_from_databricks(
             i.from_email AS sender,
             i.to_email AS recipients,
             i.subject,
-            COALESCE(i.preview, i.subject, '') AS body,
+            COALESCE(i.body, i.preview, i.subject, '') AS body,
             CAST(i.timestamp AS STRING) AS timestamp,
             i.interaction_type
         FROM {quoted_catalog}.gold.interactions i
@@ -187,12 +209,7 @@ def load_source_bundle_from_databricks(
         {message_limit_sql}
     """
     messages_rows = client.fetch_all(messages_query)
-    message_ids = tuple(
-        str(row["message_id"])
-        for row in messages_rows
-        if row.get("message_id")
-    )
-
+    message_ids = _message_ids_from_rows(messages_rows)
     people_limit_sql = f"LIMIT {people_limit}" if people_limit is not None else ""
     contacts_query = f"""
         SELECT
@@ -215,6 +232,7 @@ def load_source_bundle_from_databricks(
 
     quoted_supported_types = ", ".join(_quote_sql_string(value) for value in SUPPORTED_REVIEWED_ASSERTION_TYPES)
     quoted_message_ids = ", ".join(_quote_sql_string(value) for value in message_ids)
+    pair_scope_predicate = _pair_scoped_message_ref_predicate(message_ids)
     reviewed_assertions_query = f"""
         SELECT
             candidate_assertion_id,
@@ -232,7 +250,10 @@ def load_source_bundle_from_databricks(
             CAST(updated_at AS STRING) AS updated_at
         FROM {quoted_catalog}.memory.reviewed_assertions
         WHERE assertion_type IN ({quoted_supported_types})
-          AND subject_canonical_id IN ({quoted_message_ids})
+          AND (
+            subject_canonical_id IN ({quoted_message_ids})
+            OR {pair_scope_predicate}
+          )
     """
     review_assertion_decisions_query = f"""
         SELECT
@@ -249,7 +270,10 @@ def load_source_bundle_from_databricks(
             SELECT candidate_assertion_id
             FROM {quoted_catalog}.memory.reviewed_assertions
             WHERE assertion_type IN ({quoted_supported_types})
-              AND subject_canonical_id IN ({quoted_message_ids})
+              AND (
+                subject_canonical_id IN ({quoted_message_ids})
+                OR {pair_scope_predicate}
+              )
         )
     """
     try:

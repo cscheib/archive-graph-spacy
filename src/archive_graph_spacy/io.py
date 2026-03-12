@@ -63,7 +63,7 @@ def load_messages(path: str | Path) -> list[Message]:
             message_id=item["message_id"],
             source=item["source"],
             sender=item["sender"],
-            recipients=tuple(item.get("recipients", [])),
+            recipients=_coerce_string_array(item.get("recipients", [])),
             subject=item.get("subject", ""),
             body=item["body"],
             timestamp=(
@@ -82,7 +82,7 @@ def load_export_bundle(directory: str | Path) -> tuple[list[Contact], list[Messa
     contacts_path = base / "contacts.jsonl"
     messages_path = base / "messages.jsonl"
     if not contacts_path.exists():
-        contacts_path = base / "sample_contacts.jsonl"
+        raise FileNotFoundError(f"contacts.jsonl not found in {base}")
     if not messages_path.exists():
-        messages_path = base / "sample_messages.jsonl"
+        raise FileNotFoundError(f"messages.jsonl not found in {base}")
     return load_contacts(contacts_path), load_messages(messages_path)

@@ -1003,42 +1003,46 @@ def deploy_staged_payload(
         ).to_record()
         if cleanup_remote:
             cleanup_staged_directory(remote_dir, profile=profile)
-        return {
-            "catalog": catalog,
-            "schema": schema,
-            "remote_dir": remote_dir,
-            "warehouse_id": warehouse_id,
-            "publish_diagnostics": diagnostics,
-        }
+        return _finalize_deploy_result(
+            client=client,
+            catalog=catalog,
+            schema=schema,
+            run_id=run_id,
+            diagnostics=diagnostics,
+            remote_dir=remote_dir,
+            warehouse_id=warehouse_id,
+            profile=profile,
+            cleanup_remote=False,
+        )
     quoted_catalog = quote_sql_identifier(catalog)
     quoted_schema = quote_sql_identifier(schema)
-    client.execute(_schema_sql(catalog, schema))
     publish_stage = "staged"
     finalized_tables: list[str] = []
     failed_tables: list[str] = []
     recovery_action = "rerun_same_scope"
     manual_intervention_required = False
     error_detail = ""
-    for table_name, ddl in TABLE_DDLS.items():
-        client.execute(ddl.format(catalog=quoted_catalog, schema=quoted_schema))
-        existing_column_rows = client.fetch_all(_show_columns_sql(catalog, schema, table_name))
-        existing_columns = {
-            str(row.get("col_name") or next(iter(row.values()), ""))
-            for row in existing_column_rows
-        }
-        alter_sql = _add_missing_columns_sql(catalog, schema, table_name, existing_columns)
-        if alter_sql is not None:
-            client.execute(alter_sql)
-        remote_path = f"{remote_dir}/{table_name}.jsonl"
-        client.execute(
-            _staged_insert_sql(
-                table_name,
-                catalog=quoted_catalog,
-                schema=quoted_schema,
-                remote_path=remote_path,
-            )
-        )
     try:
+        client.execute(_schema_sql(catalog, schema))
+        for table_name, ddl in TABLE_DDLS.items():
+            client.execute(ddl.format(catalog=quoted_catalog, schema=quoted_schema))
+            existing_column_rows = client.fetch_all(_show_columns_sql(catalog, schema, table_name))
+            existing_columns = {
+                str(row.get("col_name") or next(iter(row.values()), ""))
+                for row in existing_column_rows
+            }
+            alter_sql = _add_missing_columns_sql(catalog, schema, table_name, existing_columns)
+            if alter_sql is not None:
+                client.execute(alter_sql)
+            remote_path = f"{remote_dir}/{table_name}.jsonl"
+            client.execute(
+                _staged_insert_sql(
+                    table_name,
+                    catalog=quoted_catalog,
+                    schema=quoted_schema,
+                    remote_path=remote_path,
+                )
+            )
         for table_name in publish_scope.affected_tables:
             deactivate_remote_path = _finalization_remote_path(remote_dir, table_name)
             activate_remote_path = f"{remote_dir}/{table_name}.jsonl"

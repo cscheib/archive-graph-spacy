@@ -134,3 +134,92 @@ def test_main_surfaces_publish_diagnostics_when_deploying(monkeypatch, capsys, t
     payload = json.loads(capsys.readouterr().out)
     assert payload["deployment"]["publish_diagnostics"]["publish_outcome"] == "finalized"
     assert payload["publish_diagnostics"]["recovery_action"] == "none"
+
+
+def test_main_returns_nonzero_when_deploy_fails(monkeypatch, capsys, tmp_path: Path) -> None:
+    sample_dir = tmp_path / "sample"
+    sample_dir.mkdir()
+    (sample_dir / "contacts.jsonl").write_text(
+        '{"person_id":"p-alice","display_name":"Alice Example","emails":["alice@example.com"],"entity_type":"person"}\n',
+        encoding="utf-8",
+    )
+    (sample_dir / "messages.jsonl").write_text(
+        '{"message_id":"m-001","source":"email","sender":"alice@example.com","recipients":[],"subject":"Trip hotel","body":"Flight hotel trip"}\n',
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        build_nlpdata_module,
+        "parse_args",
+        lambda: type(
+            "Args",
+            (),
+            {
+                "export_dir": str(sample_dir),
+                "source": "bundle",
+                "output_dir": None,
+                "deploy": True,
+                "profile": None,
+                "catalog": "personal_archive_dev",
+                "schema": "nlpdata",
+                "warehouse_id": "warehouse-1",
+                "message_limit": None,
+                "people_limit": None,
+                "start_date": None,
+                "end_date": None,
+                "keep_staged_files": False,
+            },
+        )(),
+    )
+    for failed_outcome in ("failed", "partial"):
+        monkeypatch.setattr(
+            build_nlpdata_module,
+            "deploy_staged_payload",
+            lambda *args, outcome=failed_outcome, **kwargs: {
+                "catalog": "personal_archive_dev",
+                "schema": "nlpdata",
+                "remote_dir": "dbfs:/tmp/archive_graph_spacy/nlpdata/run-123",
+                "warehouse_id": "warehouse-1",
+                "publish_diagnostics": {
+                    "publish_outcome": outcome,
+                    "recovery_action": "rerun_same_scope",
+                    "manual_intervention_required": False,
+                },
+            },
+        )
+
+        exit_code = build_nlpdata_module.main()
+        capsys.readouterr()
+        assert exit_code == 1, f"Expected exit 1 for outcome={failed_outcome!r}"
+
+
+def test_main_databricks_requires_output_dir(monkeypatch) -> None:
+    monkeypatch.setattr(
+        build_nlpdata_module,
+        "parse_args",
+        lambda: type(
+            "Args",
+            (),
+            {
+                "export_dir": "data_samples",
+                "source": "databricks",
+                "output_dir": None,
+                "deploy": False,
+                "profile": None,
+                "catalog": "personal_archive_dev",
+                "schema": "nlpdata",
+                "warehouse_id": "warehouse-1",
+                "message_limit": None,
+                "people_limit": None,
+                "start_date": None,
+                "end_date": None,
+                "keep_staged_files": False,
+            },
+        )(),
+    )
+
+    import pytest
+
+    with pytest.raises(SystemExit) as exc_info:
+        build_nlpdata_module.main()
+    assert exc_info.value.code != 0

@@ -97,8 +97,53 @@ def test_sql_client_polls_pending_statement_until_success() -> None:
 
     result = client.execute("SELECT 1")
 
-    assert result is succeeded
+    assert result.statement_id == "stmt-1"
+    assert result._client is workspace_client
     assert calls["count"] == 1
+
+
+def test_sql_client_wraps_results_without_mutating_sdk_objects() -> None:
+    class SlotResult:
+        __slots__ = ("status", "manifest", "result", "statement_id")
+
+        def __init__(self, *, state: str, statement_id: str | None = None) -> None:
+            self.status = SimpleNamespace(state=SimpleNamespace(value=state))
+            self.manifest = SimpleNamespace(schema=SimpleNamespace(columns=[]))
+            self.result = SimpleNamespace(data_array=[], next_chunk_internal_link=None)
+            self.statement_id = statement_id
+
+    succeeded = SlotResult(state="SUCCEEDED", statement_id="stmt-1")
+    workspace_client = SimpleNamespace(
+        statement_execution=SimpleNamespace(execute_statement=lambda **kwargs: succeeded)
+    )
+
+    client = DatabricksSqlClient(workspace_client, warehouse_id="warehouse-1")
+
+    result = client.execute("SELECT 1")
+
+    assert result.statement_id == "stmt-1"
+    assert result._client is workspace_client
+
+
+def test_rows_from_result_pages_chunks_via_wrapped_client() -> None:
+    chunk = SimpleNamespace(
+        result=SimpleNamespace(data_array=[["p-2"]], next_chunk_internal_link=None)
+    )
+    workspace_client = SimpleNamespace(
+        statement_execution=SimpleNamespace(
+            get_statement_result_chunk_n=lambda statement_id, chunk_index: chunk
+        )
+    )
+    wrapped = SimpleNamespace(
+        manifest=SimpleNamespace(schema=SimpleNamespace(columns=[SimpleNamespace(name="person_id")])),
+        result=SimpleNamespace(data_array=[["p-1"]], next_chunk_internal_link="/api/2.0/sql/statements/stmt-1/result/chunks/1"),
+        statement_id="stmt-1",
+        _client=workspace_client,
+    )
+
+    rows = rows_from_result(wrapped)
+
+    assert rows == [{"person_id": "p-1"}, {"person_id": "p-2"}]
 
 
 def test_validate_run_id_rejects_path_like_values() -> None:

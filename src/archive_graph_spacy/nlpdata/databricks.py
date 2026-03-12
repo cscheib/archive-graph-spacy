@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import time
+from dataclasses import dataclass
 from datetime import date
 from typing import TYPE_CHECKING, Any
 
@@ -19,6 +20,19 @@ else:
 
 class DatabricksSqlError(RuntimeError):
     """Raised when Databricks SQL statement execution fails."""
+
+
+@dataclass(frozen=True)
+class _StatementResultWithClient:
+    result: Any
+    client: Any
+
+    @property
+    def _client(self) -> Any:
+        return self.client
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.result, name)
 
 
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -82,10 +96,7 @@ class DatabricksSqlClient:
             statement=statement,
             wait_timeout="30s",
         )
-        try:
-            setattr(result, "_client", self.workspace_client)
-        except Exception:
-            pass
+        wrapped_result = _StatementResultWithClient(result=result, client=self.workspace_client)
         status = getattr(result, "status", None)
         state = getattr(getattr(status, "state", None), "value", None)
         if state == "FAILED":
@@ -93,7 +104,7 @@ class DatabricksSqlClient:
             message = getattr(error, "message", None) or "Databricks SQL execution failed"
             raise DatabricksSqlError(message)
         if state == "SUCCEEDED":
-            return result
+            return wrapped_result
 
         statement_id = getattr(result, "statement_id", None)
         if not statement_id:
@@ -102,14 +113,11 @@ class DatabricksSqlClient:
         deadline = time.monotonic() + self.timeout_seconds
         while time.monotonic() < deadline:
             result = self.workspace_client.statement_execution.get_statement(statement_id)
-            try:
-                setattr(result, "_client", self.workspace_client)
-            except Exception:
-                pass
+            wrapped_result = _StatementResultWithClient(result=result, client=self.workspace_client)
             status = getattr(result, "status", None)
             state = getattr(getattr(status, "state", None), "value", None)
             if state == "SUCCEEDED":
-                return result
+                return wrapped_result
             if state == "FAILED":
                 error = getattr(status, "error", None)
                 message = getattr(error, "message", None) or "Databricks SQL execution failed"

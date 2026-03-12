@@ -1,7 +1,7 @@
 import subprocess
 
 
-def test_query_edges_prints_top_pairs() -> None:
+def _build_edges_for_data_samples() -> None:
     subprocess.run(
         [
             "uv",
@@ -15,6 +15,10 @@ def test_query_edges_prints_top_pairs() -> None:
         capture_output=True,
         text=True,
     )
+
+
+def test_query_edges_prints_top_pairs() -> None:
+    _build_edges_for_data_samples()
 
     completed = subprocess.run(
         [
@@ -37,19 +41,7 @@ def test_query_edges_prints_top_pairs() -> None:
 
 
 def test_query_edges_hides_owner_from_top_pairs() -> None:
-    subprocess.run(
-        [
-            "uv",
-            "run",
-            "python",
-            "-m",
-            "archive_graph_spacy.scripts.build_edges",
-            "data_samples",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    _build_edges_for_data_samples()
 
     completed = subprocess.run(
         [
@@ -72,3 +64,29 @@ def test_query_edges_hides_owner_from_top_pairs() -> None:
     )
 
     assert "Alice Example" not in completed.stdout
+
+
+def test_query_edges_hides_owner_from_top_mentions() -> None:
+    _build_edges_for_data_samples()
+
+    completed = subprocess.run(
+        [
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "archive_graph_spacy.scripts.query_edges",
+            "data_samples/derived",
+            "--query",
+            "top_mentions",
+            "--owner-person-id",
+            "p-bob",
+            "--owner-mode",
+            "hide",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "Bob Example" not in completed.stdout
