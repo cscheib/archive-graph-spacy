@@ -12,15 +12,27 @@ from archive_graph_spacy.webapp import (
 def test_discover_bundles_finds_data_samples_and_exports(tmp_path: Path) -> None:
     samples = tmp_path / "data_samples"
     samples.mkdir()
-    (samples / "sample_contacts.jsonl").write_text("{}\n", encoding="utf-8")
+    (samples / "contacts.jsonl").write_text("{}\n", encoding="utf-8")
+    (samples / "messages.jsonl").write_text("{}\n", encoding="utf-8")
+    exports = tmp_path / "data_exports" / "bundle-a"
+    exports.mkdir(parents=True)
+    (exports / "contacts.jsonl").write_text("{}\n", encoding="utf-8")
+    (exports / "messages.jsonl").write_text("{}\n", encoding="utf-8")
+
+    bundles = discover_bundles(tmp_path)
+
+    assert samples in bundles
+    assert exports in bundles
+
+
+def test_discover_bundles_skips_incomplete_exports(tmp_path: Path) -> None:
     exports = tmp_path / "data_exports" / "bundle-a"
     exports.mkdir(parents=True)
     (exports / "contacts.jsonl").write_text("{}\n", encoding="utf-8")
 
     bundles = discover_bundles(tmp_path)
 
-    assert samples in bundles
-    assert exports in bundles
+    assert exports not in bundles
 
 
 def test_render_index_html_includes_bundle_and_person_picker(tmp_path: Path) -> None:

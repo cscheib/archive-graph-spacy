@@ -120,12 +120,10 @@ def main() -> int:
     else:
         if args.output_dir:
             output_dir = Path(args.output_dir)
-        elif args.source == "databricks":
+        else:
             raise SystemExit(
                 "error: --output-dir is required when --source databricks is used"
             )
-        else:
-            output_dir = export_dir
         result = build_nlpdata_from_databricks(
             output_dir=output_dir,
             catalog=args.catalog,

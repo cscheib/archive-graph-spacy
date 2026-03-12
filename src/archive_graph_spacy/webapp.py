@@ -42,15 +42,19 @@ def discover_bundles(base_dir: Path) -> list[Path]:
         root = base_dir / relative
         if not root.exists():
             continue
-        if relative == "data_samples" and ((root / "sample_contacts.jsonl").exists() or (root / "contacts.jsonl").exists()):
+        if relative == "data_samples" and _is_refreshable_bundle(root):
             bundles.append(root)
             continue
         for child in sorted(root.iterdir()):
             if not child.is_dir():
                 continue
-            if (child / "contacts.jsonl").exists() or (child / "sample_contacts.jsonl").exists():
+            if _is_refreshable_bundle(child):
                 bundles.append(child)
     return bundles
+
+
+def _is_refreshable_bundle(bundle: Path) -> bool:
+    return (bundle / "contacts.jsonl").exists() and (bundle / "messages.jsonl").exists()
 
 
 def list_people(derived_dir: Path) -> list[tuple[str, str]]:
@@ -599,8 +603,21 @@ def make_handler(base_dir: Path) -> type[BaseHTTPRequestHandler]:
             if bundle is None:
                 self.send_error(HTTPStatus.BAD_REQUEST, "Unknown bundle")
                 return
-            build_nlpdata(bundle)
-            build_edges(bundle)
+            if not _is_refreshable_bundle(bundle):
+                self.send_error(
+                    HTTPStatus.BAD_REQUEST,
+                    "Bundle is incomplete; requires contacts.jsonl and messages.jsonl",
+                )
+                return
+            try:
+                build_nlpdata(bundle)
+                build_edges(bundle)
+            except FileNotFoundError as exc:
+                self.send_error(
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    f"Failed to refresh bundle due to missing file: {exc}",
+                )
+                return
             self.send_response(HTTPStatus.SEE_OTHER)
             self.send_header("Location", "/?" + urlencode({"bundle": bundle.name, "notice": "Derived tables refreshed"}))
             self.end_headers()

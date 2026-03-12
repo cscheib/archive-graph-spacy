@@ -59,6 +59,24 @@ def _quote_sql_string(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
 
 
+def _message_ids_from_rows(rows: list[dict[str, object]]) -> tuple[str, ...]:
+    return tuple(str(row["message_id"]) for row in rows if row.get("message_id"))
+
+
+def _pair_scoped_message_ref_predicate(message_ids: tuple[str, ...]) -> str:
+    if not message_ids:
+        return "FALSE"
+    ref_checks = ", ".join(
+        _quote_sql_string(prefix + message_id)
+        for message_id in message_ids
+        for prefix in ("direct_message:", "indirect_message:", "message:")
+    )
+    return (
+        f"(assertion_type IN ({', '.join(_quote_sql_string(value) for value in PAIR_SCOPED_ASSERTION_TYPES)}) "
+        f"AND EXISTS(evidence_refs, ref -> ref IN ({ref_checks})))"
+    )
+
+
 def _is_missing_table_error(exc: DatabricksSqlError) -> bool:
     message = str(exc).casefold()
     return "table_or_view_not_found" in message or "not found" in message or "does not exist" in message
@@ -166,7 +184,7 @@ def load_source_bundle_from_databricks(
 
     predicates = [
         f"i.interaction_type IN ({quoted_types})",
-        "COALESCE(i.preview, i.subject) IS NOT NULL",
+        "COALESCE(i.body, i.preview, i.subject) IS NOT NULL",
     ]
     if start_date:
         predicates.append(f"i.timestamp >= {_quote_sql_string(start_date)}")
@@ -191,12 +209,7 @@ def load_source_bundle_from_databricks(
         {message_limit_sql}
     """
     messages_rows = client.fetch_all(messages_query)
-    message_ids = tuple(
-        str(row["message_id"])
-        for row in messages_rows
-        if row.get("message_id")
-    )
-
+    message_ids = _message_ids_from_rows(messages_rows)
     people_limit_sql = f"LIMIT {people_limit}" if people_limit is not None else ""
     contacts_query = f"""
         SELECT
@@ -218,8 +231,8 @@ def load_source_bundle_from_databricks(
         return source_bundle_from_rows(contacts_rows, messages_rows)
 
     quoted_supported_types = ", ".join(_quote_sql_string(value) for value in SUPPORTED_REVIEWED_ASSERTION_TYPES)
-    quoted_pair_scoped_types = ", ".join(_quote_sql_string(value) for value in PAIR_SCOPED_ASSERTION_TYPES)
     quoted_message_ids = ", ".join(_quote_sql_string(value) for value in message_ids)
+    pair_scope_predicate = _pair_scoped_message_ref_predicate(message_ids)
     reviewed_assertions_query = f"""
         SELECT
             candidate_assertion_id,
@@ -239,7 +252,7 @@ def load_source_bundle_from_databricks(
         WHERE assertion_type IN ({quoted_supported_types})
           AND (
             subject_canonical_id IN ({quoted_message_ids})
-            OR assertion_type IN ({quoted_pair_scoped_types})
+            OR {pair_scope_predicate}
           )
     """
     review_assertion_decisions_query = f"""
@@ -259,7 +272,7 @@ def load_source_bundle_from_databricks(
             WHERE assertion_type IN ({quoted_supported_types})
               AND (
                 subject_canonical_id IN ({quoted_message_ids})
-                OR assertion_type IN ({quoted_pair_scoped_types})
+                OR {pair_scope_predicate}
               )
         )
     """
