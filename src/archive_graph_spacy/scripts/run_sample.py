@@ -1,4 +1,9 @@
-"""Run the sample extraction and linking workflow."""
+"""Run the sample extraction and linking workflow.
+
+[EXPERIMENTAL] This script is not the primary product path. It is retained as a
+developer smoke-test helper only and is planned for retirement in favor of
+`build_nlpdata data_samples` and the automated pytest suite.
+"""
 
 from __future__ import annotations
 

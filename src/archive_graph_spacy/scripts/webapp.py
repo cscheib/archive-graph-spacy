@@ -1,4 +1,7 @@
-"""Run the local graph viewer web app."""
+"""Run the local graph viewer web app.
+
+[EXPERIMENTAL] See archive_graph_spacy.webapp for details.
+"""
 
 from archive_graph_spacy.webapp import main
 
