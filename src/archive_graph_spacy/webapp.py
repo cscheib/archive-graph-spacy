@@ -20,6 +20,7 @@ from archive_graph_spacy.io import load_export_bundle
 from archive_graph_spacy.link import link_mentions_to_people
 from archive_graph_spacy.models import Contact, Message
 from archive_graph_spacy.scripts.build_edges import build_edges
+from archive_graph_spacy.scripts.build_nlpdata import build_nlpdata
 from archive_graph_spacy.scripts.visualize_ego import render_ego_graph
 from archive_graph_spacy.scripts.visualize_graph import render_graph
 
@@ -598,6 +599,7 @@ def make_handler(base_dir: Path) -> type[BaseHTTPRequestHandler]:
             if bundle is None:
                 self.send_error(HTTPStatus.BAD_REQUEST, "Unknown bundle")
                 return
+            build_nlpdata(bundle)
             build_edges(bundle)
             self.send_response(HTTPStatus.SEE_OTHER)
             self.send_header("Location", "/?" + urlencode({"bundle": bundle.name, "notice": "Derived tables refreshed"}))

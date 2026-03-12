@@ -3,7 +3,7 @@ name = "archive-graph-spacy"
 version = "0.1.1"
 description = "spaCy-based named entity recognition utilities for archive graph work"
 readme = "README.md"
-requires-python = ">=3.11,<3.14"
+requires-python = "==3.12.*"
 dependencies = [
   "databricks-sdk>=0.61,<1.0",
   "duckdb>=1.2,<2.0",

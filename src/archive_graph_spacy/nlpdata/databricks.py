@@ -82,10 +82,7 @@ class DatabricksSqlClient:
             statement=statement,
             wait_timeout="30s",
         )
-        try:
-            setattr(result, "_client", self.workspace_client)
-        except Exception:
-            pass
+        result._client = self.workspace_client
         status = getattr(result, "status", None)
         state = getattr(getattr(status, "state", None), "value", None)
         if state == "FAILED":
@@ -102,10 +99,7 @@ class DatabricksSqlClient:
         deadline = time.monotonic() + self.timeout_seconds
         while time.monotonic() < deadline:
             result = self.workspace_client.statement_execution.get_statement(statement_id)
-            try:
-                setattr(result, "_client", self.workspace_client)
-            except Exception:
-                pass
+            result._client = self.workspace_client
             status = getattr(result, "status", None)
             state = getattr(getattr(status, "state", None), "value", None)
             if state == "SUCCEEDED":

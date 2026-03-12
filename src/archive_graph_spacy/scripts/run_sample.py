@@ -14,7 +14,11 @@ from archive_graph_spacy.link import link_mentions_to_people
 
 def main() -> int:
     message_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("data_samples/sample_messages.jsonl")
-    contact_path = Path("data_samples/sample_contacts.jsonl")
+    if len(sys.argv) > 2:
+        contact_path = Path(sys.argv[2])
+    else:
+        sibling = message_path.parent / "contacts.jsonl"
+        contact_path = sibling if sibling.exists() else Path("data_samples/sample_contacts.jsonl")
 
     contacts = load_contacts(contact_path)
     messages = load_messages(message_path)

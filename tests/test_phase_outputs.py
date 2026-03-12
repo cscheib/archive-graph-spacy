@@ -277,3 +277,60 @@ def test_phase_boundary_diagnostics_are_explicitly_bounded() -> None:
     assert result.run.quality_metrics["phase_boundary_merged_count"] == len(messages) - 1
     assert result.run.quality_metrics["phase_boundary_retained_count"] == 0
     assert result.run.quality_metrics["phase_boundary_diagnostic_cap"] == MAX_BOUNDARY_DIAGNOSTICS
+
+
+def test_phase_segmentation_raises_value_error_on_missing_timestamp() -> None:
+    """Validates that the timestamp guard raises ValueError (not AssertionError) when a None-timestamp
+    message somehow passes the filter stage (defensive guard).
+    """
+    import pytest
+    from archive_graph_spacy.nlpdata import pipeline as _pipeline
+
+    contacts = (
+        Contact(person_id="p-alice", display_name="Alice", emails=("alice@example.com",), entity_type="person"),
+        Contact(person_id="p-bob", display_name="Bob", emails=("bob@example.com",), entity_type="person"),
+    )
+    messages_with_ts = (
+        Message(
+            message_id="m-1",
+            source="email",
+            sender="alice@example.com",
+            recipients=("bob@example.com",),
+            subject="A",
+            body="A",
+            timestamp=datetime(2024, 1, 1, tzinfo=UTC),
+        ),
+        Message(
+            message_id="m-2",
+            source="email",
+            sender="bob@example.com",
+            recipients=("alice@example.com",),
+            subject="B",
+            body="B",
+            timestamp=datetime(2024, 3, 1, tzinfo=UTC),
+        ),
+    )
+    original_filter = _pipeline._sorted_messages_with_timestamps
+
+    def patched_filter(messages):
+        sorted_msgs = original_filter(messages)
+        null_ts_msg = Message(
+            message_id="m-null",
+            source="email",
+            sender="alice@example.com",
+            recipients=("bob@example.com",),
+            subject="null",
+            body="null",
+            timestamp=None,
+        )
+        return sorted_msgs + (null_ts_msg,)
+
+    _pipeline._sorted_messages_with_timestamps = patched_filter
+    try:
+        with pytest.raises(ValueError, match="timestamps"):
+            run_pipeline(
+                SourceBundle(contacts=contacts, messages=messages_with_ts),
+                run_scope="missing-ts",
+            )
+    finally:
+        _pipeline._sorted_messages_with_timestamps = original_filter

@@ -160,7 +160,12 @@ def _derive_phase_outputs(
     merged_count = 0
     retained_count = 0
     for index, (left, right) in enumerate(zip(sorted_messages, sorted_messages[1:]), start=1):
-        assert left.timestamp is not None and right.timestamp is not None
+        if left.timestamp is None or right.timestamp is None:
+            missing_id = left.message_id if left.timestamp is None else right.message_id
+            raise ValueError(
+                f"Phase segmentation requires all messages to have timestamps; "
+                f"missing timestamp on message_id={missing_id!r}"
+            )
         left_ts = _normalized_timestamp(left.timestamp)
         right_ts = _normalized_timestamp(right.timestamp)
         gap_days = (right_ts - left_ts).total_seconds() / 86400
