@@ -132,6 +132,45 @@ The Phase 4 artifacts are published here:
 - [ADR 005: Phase as a First-Class Derived Object](docs/adr/005-phase-first-class-object.md)
 - [ADR 006: Phase Output Contract](docs/adr/006-phase-output-contract.md)
 
+## Surface Classification
+
+Scripts and modules in this repository fall into three categories:
+
+### Supported (Primary Product Path)
+
+These are the recommended entry points for all new work:
+
+| Surface | Description |
+|---------|-------------|
+| `scripts/build_nlpdata.py` | Primary derivation pipeline; contract-enforced; Databricks-publishable |
+| `scripts/build_edges.py` | Local person-message and person-person edge derivation |
+| `scripts/query_edges.py` | DuckDB query helper for local derived edge tables |
+| `scripts/visualize_ego.py` | Local ego-network HTML rendering |
+| `scripts/visualize_graph.py` | Local full person-network HTML rendering |
+| `nlpdata/` | All canonical pipeline modules (pipeline, deploy, contracts, models) |
+
+### Experimental (Retained for Local Exploration)
+
+These utilities are **not** primary product surfaces. They are retained for
+exploratory development and debugging only. They carry an `[EXPERIMENTAL]`
+marker in their module docstrings.
+
+| Surface | Description | Superseded By |
+|---------|-------------|--------------|
+| `scripts/run_export.py` | Raw extraction/linking against an export bundle | `build_nlpdata` pipeline |
+| `scripts/run_sample.py` | Extraction/linking against sample fixtures | `build_nlpdata data_samples` or `pytest` |
+| `scripts/webapp.py` / `webapp.py` | Local graph viewer web app | Downstream review UI in `archive-graph-data` |
+| `evaluate/scoring.py` | Simple candidate-link summarizer | `nlpdata` candidate assertions diagnostics |
+
+### Planned for Retirement
+
+The experimental surfaces above are planned for retirement once their
+deterministic replacements are confirmed stable. No surface will be removed
+until replacement coverage is verified. The retirement plan is published in:
+
+- [Spec 008: Deprecate Experimental Surfaces](specs/008-deprecate-experimental-surfaces/spec.md)
+- [ROADMAP cleanup phase](docs/ROADMAP.md)
+
 ## Quickstart
 
 ```bash
@@ -176,11 +215,11 @@ uv run python -m spacy download en_core_web_sm
 
 ```text
 src/archive_graph_spacy/io.py          # Export-loading helpers
-src/archive_graph_spacy/nlpdata/       # Derived search-workspace pipeline
+src/archive_graph_spacy/nlpdata/       # Derived search-workspace pipeline [SUPPORTED]
 src/archive_graph_spacy/extract/       # Mention extraction logic
 src/archive_graph_spacy/link/          # Candidate entity linking
-src/archive_graph_spacy/evaluate/      # Metrics and scoring
-src/archive_graph_spacy/scripts/       # Small experiment entrypoints
+src/archive_graph_spacy/evaluate/      # Metrics and scoring [EXPERIMENTAL]
+src/archive_graph_spacy/scripts/       # Script entrypoints (see Surface Classification above)
 data_samples/                          # Small checked-in redacted fixtures
 tests/                                 # Local automated tests
 ```

@@ -1,4 +1,9 @@
-"""Simple summaries for experiment results."""
+"""Simple summaries for experiment results.
+
+[EXPERIMENTAL] This module is not the primary product path. It is retained only
+as a helper for the experimental run_export and run_sample scripts and is
+planned for retirement once those callers are removed.
+"""
 
 from __future__ import annotations
 

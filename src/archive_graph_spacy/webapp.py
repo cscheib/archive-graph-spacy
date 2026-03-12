@@ -1,4 +1,9 @@
-"""Small local web app for refreshing and viewing graph visualizations."""
+"""Small local web app for refreshing and viewing graph visualizations.
+
+[EXPERIMENTAL] This module is not a primary product surface. It is retained
+for local exploration only and is planned for retirement once the downstream
+review UI in archive-graph-data replaces its functionality.
+"""
 
 from __future__ import annotations
 

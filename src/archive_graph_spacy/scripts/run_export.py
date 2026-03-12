@@ -1,4 +1,9 @@
-"""Run extraction and linking against a graph-data export directory."""
+"""Run extraction and linking against a graph-data export directory.
+
+[EXPERIMENTAL] This script is not the primary product path. It is retained for
+ad hoc debugging only and is planned for retirement once the build_nlpdata
+pipeline is confirmed as the stable replacement.
+"""
 
 from __future__ import annotations
 

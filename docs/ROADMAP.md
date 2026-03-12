@@ -41,3 +41,25 @@ The current early-stage execution focus is:
 2. candidate-generation consumption and review UI in `archive-graph-data`
 3. follow-on relationship and diagnostics surfaces
 4. downstream review consumption and operational polish
+
+## Planned Cleanup Phase — Retiring Superseded Experimental Surfaces
+
+A later cleanup phase is explicitly part of the roadmap. It covers retiring the
+experimental or AI-derived surfaces that are superseded once the `nlpdata`
+pipeline and reviewed-assertions path are confirmed stable. This includes:
+
+- `scripts/run_export.py` — superseded by the `build_nlpdata` pipeline
+- `scripts/run_sample.py` — superseded by `build_nlpdata data_samples` and
+  the automated test suite
+- `webapp.py` / `scripts/webapp.py` — superseded by downstream review UI in
+  `archive-graph-data`; retained as a local exploration tool only
+- Direct use of `extract`/`link`/`evaluate` modules outside the pipeline
+  boundary — superseded by `nlpdata` contract-enforced derivation
+
+Retirement is conditioned on confirmed deterministic replacement. No experimental
+surface will be removed until a stable, tested replacement is verified in the
+supported path.
+
+The deprecation inventory and conditions are published here:
+
+- [Spec 008: Deprecate Experimental Surfaces](../specs/008-deprecate-experimental-surfaces/spec.md)
