@@ -56,6 +56,21 @@ def _mention_id(message_id: str, label: str, start_char: int, end_char: int, tex
     return f"mm-{digest}"
 
 
+def _has_covering_multi_token_person_span(
+    mentions: list[InteractionMention],
+    start_char: int,
+    end_char: int,
+) -> bool:
+    for mention in mentions:
+        if mention.label not in {"PERSON", "PERSON_CANDIDATE"}:
+            continue
+        if len(mention.span_text.split()) < 2:
+            continue
+        if mention.start_char <= start_char and mention.end_char >= end_char:
+            return True
+    return False
+
+
 def extract_message_mentions(message: Message, run_id: str) -> tuple[InteractionMention, ...]:
     text = _message_text(message)
     if not text:
@@ -169,16 +184,20 @@ def extract_message_mentions(message: Message, run_id: str) -> tuple[Interaction
         cleaned = _normalized_person_text(token.text)
         if cleaned is None:
             continue
+        start_char = token.idx
+        end_char = token.idx + len(token.text)
+        if _has_covering_multi_token_person_span(mentions, start_char, end_char):
+            continue
         mentions.append(
             InteractionMention(
-                mention_id=_mention_id(message.message_id, "PERSON_CANDIDATE", token.idx, token.idx + len(token.text), cleaned),
+                mention_id=_mention_id(message.message_id, "PERSON_CANDIDATE", start_char, end_char, cleaned),
                 run_id=run_id,
                 message_id=message.message_id,
                 source_interaction_id=message.message_id,
                 span_text=cleaned,
                 label="PERSON_CANDIDATE",
-                start_char=token.idx,
-                end_char=token.idx + len(token.text),
+                start_char=start_char,
+                end_char=end_char,
                 source_type="heuristic",
                 confidence=0.25,
             )

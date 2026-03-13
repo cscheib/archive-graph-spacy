@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from archive_graph_spacy.models import Contact, Message
 from archive_graph_spacy.edges.person_person import canonical_pair_id
+from archive_graph_spacy.nlpdata.mentions import extract_message_mentions
 from archive_graph_spacy.nlpdata.pipeline import build_pipeline_payload, run_pipeline
 from archive_graph_spacy.nlpdata.person_links import _normalized_reviewed_inputs, derive_candidate_assertions
 from archive_graph_spacy.nlpdata.source_loader import load_source_bundle
@@ -60,9 +61,7 @@ def test_candidate_payload_publishes_jsonl_and_summary_contract_surfaces() -> No
         "person_link_disambiguation": 3,
         "relay_sender_identity": 2,
     }
-    assert payload["candidate_assertions_summary"]["suppressed_counts"] == {
-        "suppressed_disambiguation_low_value": 3,
-    }
+    assert payload["candidate_assertions_summary"]["suppressed_counts"] == {}
     assert len(payload["candidate_assertions_summary"]["example_candidate_ids"]) == 5
 
 
@@ -172,3 +171,61 @@ def test_relationship_evidence_candidates_share_phase3_pair_id_helper() -> None:
     )
 
     assert candidate.subject_canonical_id == canonical_pair_id("p-alice", "p-bob")
+
+
+def test_nlpdata_mentions_skip_nested_single_token_greeting_name_candidates() -> None:
+    message = Message(
+        message_id="m-greeting",
+        source="email",
+        sender="friend@example.com",
+        recipients=(),
+        subject="",
+        body="Hello Christopher J Scheib,\nWanted to follow up.",
+    )
+
+    mentions = extract_message_mentions(message, run_id="run-greeting")
+    mention_texts = {mention.span_text for mention in mentions}
+
+    assert "Christopher J Scheib" in mention_texts
+    assert "Christopher" not in mention_texts
+
+
+def test_full_name_greeting_does_not_emit_nested_single_token_disambiguation() -> None:
+    contacts = (
+        Contact(
+            person_id="p-owner",
+            display_name="Christopher J Scheib",
+            emails=("owner@example.com",),
+            entity_type="person",
+        ),
+        Contact(
+            person_id="p-other",
+            display_name="Christopher Stone",
+            emails=("other@example.com",),
+            entity_type="person",
+        ),
+    )
+    messages = (
+        Message(
+            message_id="m-greeting",
+            source="email",
+            sender="friend@example.com",
+            recipients=(),
+            subject="",
+            body="Hello Christopher J Scheib,\nWanted to follow up.",
+        ),
+    )
+
+    candidates, summary = derive_candidate_assertions(
+        messages,
+        contacts,
+        run_id="run-greeting",
+        generation_scope="greeting-scope",
+    )
+
+    assert [
+        candidate
+        for candidate in candidates
+        if candidate.assertion_type == "person_link_disambiguation"
+    ] == []
+    assert summary.suppressed_counts == {}
