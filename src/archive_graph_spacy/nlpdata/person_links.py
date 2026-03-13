@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections import defaultdict
 from datetime import timezone, datetime
 from dataclasses import dataclass
@@ -418,13 +419,12 @@ def _normalized_reviewed_inputs(
             "review_state": str(row.get("current_review_state") or ""),
             "generation_scope": None if row.get("generation_scope") in (None, "") else str(row.get("generation_scope")),
             "evidence_refs": _ensure_list(row.get("evidence_refs")),
+            "selected_person_id": str(row.get("selected_person_id") or ""),
+            "selected_person_name": str(row.get("selected_person_name") or ""),
         }
     for row in review_assertion_decisions:
         candidate_id = str(row.get("candidate_assertion_id") or "")
         if not candidate_id:
-            continue
-        if candidate_id in by_candidate:
-            by_candidate[candidate_id]["decision_state"] = str(row.get("decision_state") or "")
             continue
         snapshot = row.get("evidence_snapshot")
         parsed: dict[str, object] = {}
@@ -435,6 +435,13 @@ def _normalized_reviewed_inputs(
                 maybe = {}
             if isinstance(maybe, dict):
                 parsed = maybe
+        if candidate_id in by_candidate:
+            by_candidate[candidate_id]["decision_state"] = str(row.get("decision_state") or "")
+            if parsed.get("selected_person_id"):
+                by_candidate[candidate_id]["selected_person_id"] = str(parsed.get("selected_person_id") or "")
+            if parsed.get("selected_person_name"):
+                by_candidate[candidate_id]["selected_person_name"] = str(parsed.get("selected_person_name") or "")
+            continue
         by_candidate[candidate_id] = {
             "candidate_assertion_id": candidate_id,
             "assertion_type": str(parsed.get("assertion_type") or ""),
@@ -442,7 +449,9 @@ def _normalized_reviewed_inputs(
             "proposed_claim": str(parsed.get("proposed_claim") or ""),
             "review_state": str(row.get("decision_state") or ""),
             "generation_scope": None if parsed.get("generation_scope") in (None, "") else str(parsed.get("generation_scope")),
-            "evidence_refs": (),
+            "evidence_refs": _ensure_list(parsed.get("evidence_refs")),
+            "selected_person_id": str(parsed.get("selected_person_id") or ""),
+            "selected_person_name": str(parsed.get("selected_person_name") or ""),
         }
     return list(by_candidate.values())
 
@@ -531,6 +540,38 @@ def _reviewed_relay_link(
         confidence=1.0,
         evidence_type="reviewed_assertion",
         evidence_value=sender,
+        source_interaction_id=message_id,
+    )
+
+
+def _reviewed_disambiguation_link(
+    *,
+    reviewed: dict[str, object],
+    run_id: str,
+    contacts: tuple[Contact, ...],
+) -> PersonMessageLink | None:
+    person_id = str(reviewed.get("selected_person_id") or "").strip()
+    if not person_id:
+        return None
+    contact_lookup = {contact.person_id: contact for contact in effective_person_contacts(contacts)}
+    contact = contact_lookup.get(person_id)
+    if contact is None:
+        return None
+    message_id = str(reviewed.get("subject_canonical_id") or "")
+    proposed_claim = str(reviewed.get("proposed_claim") or "")
+    match = re.search(r"mention\s+\S+\s+'([^']+)'", proposed_claim)
+    mention_text = match.group(1) if match else str(reviewed.get("selected_person_name") or person_id)
+    return PersonMessageLink(
+        link_id=_link_id(message_id, person_id, "mentioned", "reviewed"),
+        run_id=run_id,
+        message_id=message_id,
+        person_id=person_id,
+        person_name=contact.display_name,
+        role="mentioned",
+        link_origin="reviewed",
+        confidence=1.0,
+        evidence_type="reviewed_assertion",
+        evidence_value=mention_text,
         source_interaction_id=message_id,
     )
 
@@ -638,6 +679,8 @@ def apply_reviewed_feedback(
             link = None
             if matched.assertion_type == "relay_sender_identity":
                 link = _reviewed_relay_link(reviewed=reviewed, run_id=run_id, contacts=contacts)
+            elif matched.assertion_type == "person_link_disambiguation":
+                link = _reviewed_disambiguation_link(reviewed=reviewed, run_id=run_id, contacts=contacts)
             if link is not None:
                 extra_links[(link.message_id, link.person_id, link.role)] = link
             reviewed_effects.append(

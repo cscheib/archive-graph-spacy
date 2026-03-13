@@ -1,3 +1,5 @@
+import json
+
 from archive_graph_spacy.nlpdata.pipeline import build_pipeline_payload, run_pipeline
 from archive_graph_spacy.nlpdata.runs import meets_runtime_goal, semantic_replay_key
 from archive_graph_spacy.nlpdata.source_loader import load_source_bundle
@@ -184,3 +186,56 @@ def test_semantic_replay_key_separates_generation_scopes() -> None:
     )
 
     assert first != second
+
+
+def test_run_pipeline_replays_accepted_disambiguation_selection_as_reviewed_mention_link() -> None:
+    bundle = load_source_bundle("data_samples/candidate_assertions")
+    current_result = run_pipeline(bundle, run_scope="data_samples/candidate_assertions")
+    current_candidate = next(
+        candidate
+        for candidate in current_result.candidate_assertions
+        if candidate.assertion_type == "person_link_disambiguation" and "Jamie" in candidate.proposed_claim
+    )
+    replay_bundle = SourceBundle(
+        contacts=bundle.contacts,
+        messages=bundle.messages,
+        reviewed_assertions=(
+            {
+                "candidate_assertion_id": current_candidate.candidate_assertion_id,
+                "assertion_type": current_candidate.assertion_type,
+                "subject_canonical_id": current_candidate.subject_canonical_id,
+                "proposed_claim": current_candidate.proposed_claim,
+                "current_review_state": "accepted",
+                "evidence_refs": list(current_candidate.evidence_refs),
+            },
+        ),
+        review_assertion_decisions=(
+            {
+                "candidate_assertion_id": current_candidate.candidate_assertion_id,
+                "decision_state": "accepted",
+                "evidence_snapshot": json.dumps(
+                    {
+                        "candidate_assertion_id": current_candidate.candidate_assertion_id,
+                        "selected_person_id": "p-jamie-a",
+                        "selected_person_name": "Jamie Alpha",
+                    }
+                ),
+            },
+        ),
+    )
+
+    result = run_pipeline(replay_bundle, run_scope="data_samples/candidate_assertions")
+
+    assert any(
+        link.link_origin == "reviewed"
+        and link.role == "mentioned"
+        and link.person_id == "p-jamie-a"
+        and link.message_id == current_candidate.subject_canonical_id
+        for link in result.person_links
+    )
+    assert any(
+        effect.assertion_type == "person_link_disambiguation"
+        and effect.result == "applied"
+        and effect.candidate_assertion_id == current_candidate.candidate_assertion_id
+        for effect in result.reviewed_effects
+    )

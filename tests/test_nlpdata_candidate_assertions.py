@@ -134,6 +134,31 @@ def test_normalized_reviewed_inputs_parses_stringified_evidence_refs() -> None:
     assert reviewed[0]["evidence_refs"] == ("message:m-1", "sender:relay+one@example.com")
 
 
+def test_normalized_reviewed_inputs_merges_selected_person_from_decision_snapshot() -> None:
+    reviewed = _normalized_reviewed_inputs(
+        (
+            {
+                "candidate_assertion_id": "ca-2",
+                "assertion_type": "person_link_disambiguation",
+                "subject_canonical_id": "m-2",
+                "proposed_claim": "mention mm-2 'Chris' is ambiguous across p-a, p-b",
+                "current_review_state": "accepted",
+                "evidence_refs": ["message:m-2", "mention:mm-2"],
+            },
+        ),
+        (
+            {
+                "candidate_assertion_id": "ca-2",
+                "decision_state": "accepted",
+                "evidence_snapshot": '{"selected_person_id":"p-b","selected_person_name":"Chris Beta"}',
+            },
+        ),
+    )
+
+    assert reviewed[0]["selected_person_id"] == "p-b"
+    assert reviewed[0]["selected_person_name"] == "Chris Beta"
+
+
 def test_relationship_evidence_candidates_share_phase3_pair_id_helper() -> None:
     result = run_pipeline(
         load_source_bundle("data_samples/feedback_relationship_outputs"),
