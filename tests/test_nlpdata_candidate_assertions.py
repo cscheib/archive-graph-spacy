@@ -229,3 +229,43 @@ def test_full_name_greeting_does_not_emit_nested_single_token_disambiguation() -
         if candidate.assertion_type == "person_link_disambiguation"
     ] == []
     assert summary.suppressed_counts == {}
+
+
+def test_system_generated_notifications_do_not_emit_review_candidates() -> None:
+    contacts = (
+        Contact(
+            person_id="p-chris-a",
+            display_name="Chris Alpha",
+            emails=("chris.alpha@example.com",),
+            entity_type="person",
+        ),
+        Contact(
+            person_id="p-chris-b",
+            display_name="Chris Beta",
+            emails=("chris.beta@example.com",),
+            entity_type="person",
+        ),
+    )
+    messages = (
+        Message(
+            message_id="m-newsletter",
+            source="gmail",
+            sender="noreply@example.com",
+            recipients=(),
+            subject="Weekly digest",
+            body="Hello Chris, here is your weekly update.",
+            interaction_type="linkedin_notification",
+        ),
+    )
+
+    candidates, summary = derive_candidate_assertions(
+        messages,
+        contacts,
+        run_id="run-newsletter",
+        generation_scope="newsletter-scope",
+    )
+
+    assert candidates == ()
+    assert summary.suppressed_counts == {
+        "suppressed_system_generated_review_candidate": 1,
+    }

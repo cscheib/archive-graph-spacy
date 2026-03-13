@@ -24,6 +24,7 @@ from .models import (
 )
 from .runs import semantic_replay_key
 from .source_loader import _ensure_list, contact_email_index, effective_person_contacts
+from .themes import is_system_generated_message
 
 MIN_PERSON_LINK_CONFIDENCE = 0.5
 MIN_RELAY_CANDIDATE_CONFIDENCE = 0.75
@@ -277,11 +278,17 @@ def derive_candidate_assertions(
     candidates_by_id: dict[str, CandidateAssertion] = {}
     suppressed = defaultdict(int)
     contexts = derive_link_contexts(messages, contacts, run_id)
+    reviewable_contexts: list[DerivedLinkContext] = []
+    for context in contexts:
+        if is_system_generated_message(context.message):
+            suppressed["suppressed_system_generated_review_candidate"] += 1
+            continue
+        reviewable_contexts.append(context)
     email_lookup = contact_email_index(contacts)
     person_contacts = effective_person_contacts(contacts)
     person_lookup = {contact.person_id: contact for contact in person_contacts}
 
-    for context in contexts:
+    for context in reviewable_contexts:
         message = context.message
         sender_contact = email_lookup.get(message.sender.casefold())
         extracted_mentions = context.extracted_mentions
@@ -344,7 +351,7 @@ def derive_candidate_assertions(
             candidates_by_id[candidate.candidate_assertion_id] = candidate
 
     pair_evidence: dict[tuple[str, str], dict[str, object]] = {}
-    for context in contexts:
+    for context in reviewable_contexts:
         direct_participants = set(context.explicit_participants)
         sorted_participants = sorted(direct_participants)
         for idx, left in enumerate(sorted_participants):
