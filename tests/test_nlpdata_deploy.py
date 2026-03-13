@@ -74,6 +74,42 @@ def _write_payload_fixture(tmp_path: Path, run_id: str = "run-123") -> None:
         + "\n",
         encoding="utf-8",
     )
+    (tmp_path / "candidate_assertions.jsonl").write_text(
+        json.dumps(
+            {
+                "candidate_assertion_id": "ca-001",
+                "run_id": run_id,
+                "assertion_type": "relay_sender_identity",
+                "subject_canonical_id": "m-001",
+                "proposed_claim": "relay sender relay+alice@example.com maps to p-001",
+                "evidence_refs": ["message:m-001", "sender:relay+alice@example.com"],
+                "provenance_summary": "Derived from unresolved sender plus inferred link from message m-001",
+                "confidence_level": 0.95,
+                "generation_scope": "sample-scope",
+                "generated_at": "2026-03-08T00:00:05+00:00",
+                "review_class": "reviewable",
+                "promotion_class": "promotion_eligible",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "candidate_assertions_summary.json").write_text(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "generation_scope": "sample-scope",
+                "emitted_candidate_count": 1,
+                "candidate_counts_by_type": {"relay_sender_identity": 1},
+                "suppressed_counts": {},
+                "example_candidate_ids": ["ca-001"],
+                "generated_at": "2026-03-08T00:00:05+00:00",
+                "reviewed_effect_counts": {"applied": 1},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     (tmp_path / "reviewed_effects.jsonl").write_text(
         json.dumps(
             {
@@ -344,10 +380,13 @@ def test_deploy_staged_payload_creates_schema_and_merges_current_tables(monkeypa
     assert result["schema"] == DEFAULT_SCHEMA
     assert result["publish_diagnostics"]["publish_outcome"] == "finalized"
     assert any("CREATE SCHEMA IF NOT EXISTS `personal_archive_dev`.`nlpdata`" in stmt for stmt in sql_client.statements)
+    assert any("CREATE TABLE IF NOT EXISTS `personal_archive_dev`.`nlpdata`.candidate_assertions" in stmt for stmt in sql_client.statements)
+    assert any("CREATE TABLE IF NOT EXISTS `personal_archive_dev`.`nlpdata`.candidate_assertions_summary" in stmt for stmt in sql_client.statements)
     assert any("CREATE TABLE IF NOT EXISTS `personal_archive_dev`.`nlpdata`.message_search_docs" in stmt for stmt in sql_client.statements)
     assert any("CREATE TABLE IF NOT EXISTS `personal_archive_dev`.`nlpdata`.person_person_edges" in stmt for stmt in sql_client.statements)
     assert any("CREATE TABLE IF NOT EXISTS `personal_archive_dev`.`nlpdata`.phases" in stmt for stmt in sql_client.statements)
     assert any("CREATE TABLE IF NOT EXISTS `personal_archive_dev`.`nlpdata`.phase_pair_summaries" in stmt for stmt in sql_client.statements)
+    assert any("DELETE FROM `personal_archive_dev`.`nlpdata`.`candidate_assertions`" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`message_person_links`" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`person_person_edges`" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`phases`" in stmt for stmt in sql_client.statements)
@@ -356,6 +395,9 @@ def test_deploy_staged_payload_creates_schema_and_merges_current_tables(monkeypa
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`message_theme_tags`" in stmt for stmt in sql_client.statements)
     assert any("UPDATE `personal_archive_dev`.`nlpdata`.`message_search_docs`" in stmt for stmt in sql_client.statements)
     assert any("INSERT INTO `personal_archive_dev`.`nlpdata`.nlp_runs" in stmt for stmt in sql_client.statements)
+    assert any("INSERT INTO `personal_archive_dev`.`nlpdata`.candidate_assertions" in stmt for stmt in sql_client.statements)
+    assert any("INSERT INTO `personal_archive_dev`.`nlpdata`.candidate_assertions_summary" in stmt for stmt in sql_client.statements)
+    assert any("candidate_assertions_summary.json" in stmt for stmt in sql_client.statements)
     insert_index = next(i for i, stmt in enumerate(sql_client.statements) if "INSERT INTO `personal_archive_dev`.`nlpdata`.message_person_links" in stmt)
     deactivate_index = next(i for i, stmt in enumerate(sql_client.statements) if "UPDATE `personal_archive_dev`.`nlpdata`.`message_person_links`" in stmt)
     activate_index = max(i for i, stmt in enumerate(sql_client.statements) if "SET is_current = true" in stmt and "`message_person_links`" in stmt)

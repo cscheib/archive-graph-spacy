@@ -34,7 +34,11 @@ from archive_graph_spacy.nlpdata.databricks import (
     validate_iso_date,
 )
 from archive_graph_spacy.nlpdata.deploy import CURRENT_STATE_IDENTITY_COLUMNS, CURRENT_STATE_TABLES, TABLE_DDLS
-from archive_graph_spacy.nlpdata.deploy import _add_missing_columns_sql, _show_columns_sql
+from archive_graph_spacy.nlpdata.deploy import (
+    _add_missing_columns_sql,
+    _delete_matching_candidate_assertions_sql,
+    _show_columns_sql,
+)
 from archive_graph_spacy.nlpdata.pipeline import run_pipeline
 from archive_graph_spacy.nlpdata.spark_views import create_temp_view_from_rows
 from archive_graph_spacy.nlpdata.source_loader import source_bundle_from_rows
@@ -145,6 +149,7 @@ payload = {
     "message_mentions": [row.to_record() for row in result.mentions],
     "message_person_links": [row.to_record() for row in result.person_links],
     "candidate_assertions": [row.to_record() for row in result.candidate_assertions],
+    "candidate_assertions_summary": [result.candidate_summary.to_record()],
     "reviewed_effects": [row.to_record() for row in result.reviewed_effects],
     "person_person_edges": [row.to_record() for row in result.person_person_edges],
     "person_person_edge_evidence": [row.to_record() for row in result.person_person_edge_evidence],
@@ -190,6 +195,14 @@ for table_name, ddl in TABLE_DDLS.items():
             table_name=table_name,
             rows=rows,
             temp_view=temp_view,
+        )
+    if table_name == "candidate_assertions":
+        spark.sql(
+            _delete_matching_candidate_assertions_sql(
+                catalog,
+                schema,
+                source_relation_sql=temp_view,
+            )
         )
     if table_name in CURRENT_STATE_TABLES:
         identity_column = CURRENT_STATE_IDENTITY_COLUMNS[table_name]

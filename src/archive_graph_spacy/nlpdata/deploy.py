@@ -108,6 +108,34 @@ CREATE TABLE IF NOT EXISTS {catalog}.{schema}.message_person_links (
   is_current BOOLEAN
 ) USING DELTA
 """.strip(),
+    "candidate_assertions": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.candidate_assertions (
+  candidate_assertion_id STRING,
+  run_id STRING,
+  assertion_type STRING,
+  subject_canonical_id STRING,
+  proposed_claim STRING,
+  evidence_refs ARRAY<STRING>,
+  provenance_summary STRING,
+  confidence_level DOUBLE,
+  generation_scope STRING,
+  generated_at TIMESTAMP,
+  review_class STRING,
+  promotion_class STRING
+) USING DELTA
+""".strip(),
+    "candidate_assertions_summary": """
+CREATE TABLE IF NOT EXISTS {catalog}.{schema}.candidate_assertions_summary (
+  run_id STRING,
+  generation_scope STRING,
+  emitted_candidate_count BIGINT,
+  candidate_counts_by_type MAP<STRING, BIGINT>,
+  suppressed_counts MAP<STRING, BIGINT>,
+  example_candidate_ids ARRAY<STRING>,
+  generated_at TIMESTAMP,
+  reviewed_effect_counts MAP<STRING, BIGINT>
+) USING DELTA
+""".strip(),
     "reviewed_effects": """
 CREATE TABLE IF NOT EXISTS {catalog}.{schema}.reviewed_effects (
   run_id STRING,
@@ -307,6 +335,30 @@ TABLE_COLUMN_TYPES: dict[str, dict[str, str]] = {
         "source_interaction_id": "STRING",
         "is_current": "BOOLEAN",
     },
+    "candidate_assertions": {
+        "candidate_assertion_id": "STRING",
+        "run_id": "STRING",
+        "assertion_type": "STRING",
+        "subject_canonical_id": "STRING",
+        "proposed_claim": "STRING",
+        "evidence_refs": "ARRAY<STRING>",
+        "provenance_summary": "STRING",
+        "confidence_level": "DOUBLE",
+        "generation_scope": "STRING",
+        "generated_at": "TIMESTAMP",
+        "review_class": "STRING",
+        "promotion_class": "STRING",
+    },
+    "candidate_assertions_summary": {
+        "run_id": "STRING",
+        "generation_scope": "STRING",
+        "emitted_candidate_count": "BIGINT",
+        "candidate_counts_by_type": "MAP<STRING, BIGINT>",
+        "suppressed_counts": "MAP<STRING, BIGINT>",
+        "example_candidate_ids": "ARRAY<STRING>",
+        "generated_at": "TIMESTAMP",
+        "reviewed_effect_counts": "MAP<STRING, BIGINT>",
+    },
     "reviewed_effects": {
         "run_id": "STRING",
         "candidate_assertion_id": "STRING",
@@ -489,6 +541,36 @@ SELECT
   evidence_value,
   source_interaction_id,
   CAST(is_current AS BOOLEAN)
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
+    "candidate_assertions": """
+INSERT INTO {catalog}.{schema}.candidate_assertions
+SELECT
+  candidate_assertion_id,
+  run_id,
+  assertion_type,
+  subject_canonical_id,
+  proposed_claim,
+  from_json(to_json(evidence_refs), 'array<string>'),
+  provenance_summary,
+  CAST(confidence_level AS DOUBLE),
+  generation_scope,
+  CAST(generated_at AS TIMESTAMP),
+  review_class,
+  promotion_class
+FROM read_files({remote_path}, format => 'json')
+""".strip(),
+    "candidate_assertions_summary": """
+INSERT INTO {catalog}.{schema}.candidate_assertions_summary
+SELECT
+  run_id,
+  generation_scope,
+  CAST(emitted_candidate_count AS BIGINT),
+  from_json(to_json(candidate_counts_by_type), 'map<string,bigint>'),
+  from_json(to_json(suppressed_counts), 'map<string,bigint>'),
+  from_json(to_json(example_candidate_ids), 'array<string>'),
+  CAST(generated_at AS TIMESTAMP),
+  from_json(to_json(reviewed_effect_counts), 'map<string,bigint>')
 FROM read_files({remote_path}, format => 'json')
 """.strip(),
     "reviewed_effects": """
@@ -818,6 +900,38 @@ def _finalization_remote_path(remote_dir: str, table_name: str) -> str:
     return f"{remote_dir}/{reference_table}.jsonl"
 
 
+def _artifact_filename(table_name: str) -> str:
+    if table_name == "candidate_assertions_summary":
+        return f"{table_name}.json"
+    return f"{table_name}.jsonl"
+
+
+def _artifact_remote_path(remote_dir: str, table_name: str) -> str:
+    return f"{remote_dir}/{_artifact_filename(table_name)}"
+
+
+def _delete_matching_candidate_assertions_sql(
+    catalog: str,
+    schema: str,
+    *,
+    source_relation_sql: str,
+) -> str:
+    qualified_table = ".".join(
+        (
+            quote_sql_identifier(catalog),
+            quote_sql_identifier(schema),
+            quote_sql_identifier("candidate_assertions"),
+        )
+    )
+    return f"""
+DELETE FROM {qualified_table}
+WHERE candidate_assertion_id IN (
+  SELECT DISTINCT candidate_assertion_id
+  FROM {source_relation_sql}
+)
+""".strip()
+
+
 def _update_run_diagnostics_sql(catalog: str, schema: str, run_id: str, diagnostics: dict[str, object]) -> str:
     qualified_table = ".".join(
         (
@@ -1034,7 +1148,15 @@ def deploy_staged_payload(
             alter_sql = _add_missing_columns_sql(catalog, schema, table_name, existing_columns)
             if alter_sql is not None:
                 client.execute(alter_sql)
-            remote_path = f"{remote_dir}/{table_name}.jsonl"
+            remote_path = _artifact_remote_path(remote_dir, table_name)
+            if table_name == "candidate_assertions":
+                client.execute(
+                    _delete_matching_candidate_assertions_sql(
+                        catalog,
+                        schema,
+                        source_relation_sql=f"read_files({quote_sql_string_literal(remote_path)}, format => 'json')",
+                    )
+                )
             client.execute(
                 _staged_insert_sql(
                     table_name,
