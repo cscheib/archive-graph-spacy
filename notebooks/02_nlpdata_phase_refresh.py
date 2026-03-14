@@ -31,7 +31,7 @@ from archive_graph_spacy.nlpdata.databricks import quote_sql_identifier, quote_s
 from archive_graph_spacy.nlpdata.deploy import PHASE_SCOPE_TABLES, TABLE_DDLS
 from archive_graph_spacy.nlpdata.deploy import (
     _add_missing_columns_sql,
-    _deactivate_phase_scope_rows_sql,
+    _deactivate_all_current_phase_rows_sql,
     _show_columns_sql,
 )
 from archive_graph_spacy.nlpdata.models import (
@@ -263,9 +263,14 @@ for table_name in (
     "phase_pair_summaries",
     "phase_pair_evidence",
     "phase_representative_interactions",
+    "phase_diagnostics",
+):
+    spark.sql(_deactivate_all_current_phase_rows_sql(catalog, schema, table_name))
+
+for table_name in (
     "phases",
 ):
-    spark.sql(_deactivate_phase_scope_rows_sql(catalog, schema, table_name, phase_result.run.run_scope))
+    spark.sql(_deactivate_all_current_phase_rows_sql(catalog, schema, table_name))
 
 for table_name, rows in payload.items():
     if table_name != "nlp_runs" and not rows:

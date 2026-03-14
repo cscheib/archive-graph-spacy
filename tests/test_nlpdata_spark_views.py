@@ -203,6 +203,8 @@ def test_phase_refresh_notebook_uses_preview_subject_message_text() -> None:
     assert "COALESCE(i.preview, i.subject) IS NOT NULL" in notebook
     assert "COALESCE(i.preview, i.subject, '') AS body" in notebook
     assert "COALESCE(i.body, i.preview, i.subject)" not in notebook
+    assert "_deactivate_all_current_phase_rows_sql" in notebook
+    assert "_deactivate_phase_scope_rows_sql(catalog, schema, table_name, phase_result.run.run_scope)" not in notebook
 
 
 @pytest.mark.skipif(

@@ -512,6 +512,26 @@ def test_phase_scope_finalization_uses_run_scope_when_phase_payload_is_empty(
     )
 
 
+def test_deactivate_all_current_phase_rows_sql_retire_all_current_phase_rows() -> None:
+    from archive_graph_spacy.nlpdata.deploy import _deactivate_all_current_phase_rows_sql
+
+    phases_sql = _deactivate_all_current_phase_rows_sql("personal_archive_dev", "nlpdata", "phases")
+    children_sql = _deactivate_all_current_phase_rows_sql(
+        "personal_archive_dev",
+        "nlpdata",
+        "phase_central_people",
+    )
+
+    assert "UPDATE `personal_archive_dev`.`nlpdata`.`phases`" in phases_sql
+    assert "WHERE is_current = true" in phases_sql
+    assert "generation_scope" not in phases_sql
+
+    assert "UPDATE `personal_archive_dev`.`nlpdata`.`phase_central_people`" in children_sql
+    assert "FROM `personal_archive_dev`.`nlpdata`.`phases`" in children_sql
+    assert "WHERE is_current = true" in children_sql
+    assert "generation_scope" not in children_sql
+
+
 def test_deploy_staged_payload_adds_missing_contract_columns(monkeypatch, tmp_path: Path) -> None:
     _write_payload_fixture(tmp_path)
 

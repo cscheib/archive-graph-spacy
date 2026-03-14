@@ -875,6 +875,39 @@ WHERE is_current = true
 """.strip()
 
 
+def _deactivate_all_current_phase_rows_sql(catalog: str, schema: str, table_name: str) -> str:
+    qualified_table = ".".join(
+        (
+            quote_sql_identifier(catalog),
+            quote_sql_identifier(schema),
+            quote_sql_identifier(table_name),
+        )
+    )
+    qualified_phases = ".".join(
+        (
+            quote_sql_identifier(catalog),
+            quote_sql_identifier(schema),
+            quote_sql_identifier("phases"),
+        )
+    )
+    if table_name == "phases":
+        return f"""
+UPDATE {qualified_table}
+SET is_current = false
+WHERE is_current = true
+""".strip()
+    return f"""
+UPDATE {qualified_table}
+SET is_current = false
+WHERE is_current = true
+  AND phase_id IN (
+    SELECT DISTINCT phase_id
+    FROM {qualified_phases}
+    WHERE is_current = true
+  )
+""".strip()
+
+
 def _activate_staged_rows_sql(catalog: str, schema: str, table_name: str, run_id: str, remote_path: str) -> str:
     identity_column = CURRENT_STATE_IDENTITY_COLUMNS[table_name]
     qualified_table = ".".join(
