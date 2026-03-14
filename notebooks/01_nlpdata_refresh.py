@@ -165,14 +165,13 @@ payload = {
 
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {quoted_catalog}.{quoted_schema}")
 
-for table_name, ddl in TABLE_DDLS.items():
-    spark.sql(ddl.format(catalog=quoted_catalog, schema=quoted_schema))
+for table_name, rows in payload.items():
+    spark.sql(TABLE_DDLS[table_name].format(catalog=quoted_catalog, schema=quoted_schema))
     existing_column_rows = spark.sql(_show_columns_sql(catalog, schema, table_name)).collect()
     existing_columns = {str(row["col_name"]) for row in existing_column_rows}
     alter_sql = _add_missing_columns_sql(catalog, schema, table_name, existing_columns)
     if alter_sql is not None:
         spark.sql(alter_sql)
-    rows = payload[table_name]
     if not rows:
         continue
     temp_view = f"tmp_{table_name}"

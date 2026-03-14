@@ -186,6 +186,8 @@ def test_refresh_notebook_uses_typed_temp_view_helper() -> None:
     assert "alter_sql = _add_missing_columns_sql(catalog, schema, table_name, existing_columns)" in notebook
     assert "if alter_sql is not None:" in notebook
     assert "spark.sql(alter_sql)" in notebook
+    assert "for table_name, rows in payload.items():" in notebook
+    assert "rows = payload[table_name]" not in notebook
     assert 'if table_name == "nlp_runs":' in notebook
     assert '"candidate_assertions_summary": [result.candidate_summary.to_record()]' in notebook
     assert '"reviewed_effects": [row.to_record() for row in result.reviewed_effects]' in notebook
