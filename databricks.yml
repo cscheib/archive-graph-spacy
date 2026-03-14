@@ -13,7 +13,7 @@ variables:
     default: chris@scheib.io
   wheel_version:
     description: Python wheel version (matches pyproject.toml)
-    default: "0.1.2"
+    default: "0.1.3"
   wheel_path:
     description: Workspace wheel path
     default: ""
@@ -22,7 +22,7 @@ artifacts:
   archive_graph_spacy:
     type: whl
     path: .
-    build: uv build
+    build: uv run python tools/check_wheel_version.py --mode working-tree && uv build
 
 include:
   - resources/*.yml

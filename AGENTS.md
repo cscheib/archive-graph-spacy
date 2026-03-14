@@ -34,6 +34,13 @@ not source material.
 - `uv run python tools/deploy_bundle.py dev`:
   deploy the Databricks bundle with a wheel version derived from current wheel
   contents, so the wheel path only changes when packaged code changes.
+- `git config core.hooksPath .githooks`:
+  enable the repo-managed pre-commit hook that requires a base version bump in
+  `pyproject.toml` whenever staged wheel contents change and keeps
+  `databricks.yml` `wheel_version` synchronized.
+- `databricks bundle deploy -t dev` now also runs the same wheel-version guard
+  against the working tree before building the artifact, so deploy fails fast
+  when packaged code changed without a version bump.
 - `databricks bundle run -t dev nlpdata_refresh`:
   execute the bundle-managed refresh job against Databricks source tables.
 - `uv run python -m archive_graph_spacy.scripts.run_export data_exports/<name>`:

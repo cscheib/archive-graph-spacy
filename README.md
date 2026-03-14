@@ -327,6 +327,26 @@ uses Spark SQL to read directly from `personal_archive_dev.gold` and
 Use `uv run python tools/deploy_bundle.py dev` when packaged Python code has
 changed and you need a fresh wheel path for Databricks serverless caching.
 
+Recommended commit-time hooks:
+
+- Enable the repo-managed pre-commit hook in [/.githooks/pre-commit](/Users/chris/src/archive-graph-spacy/.githooks/pre-commit) once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+- That hook runs `uv run python tools/check_wheel_version.py`.
+- It checks staged changes under `src/archive_graph_spacy/`, `README.md`, and
+  non-version edits in `pyproject.toml`, requires a bump to
+  `[project].version`, and ensures `databricks.yml`
+  `variables.wheel_version.default` stays in sync.
+- `databricks bundle deploy` enforces the same rule during artifact build,
+  because the bundle now runs `uv run python tools/check_wheel_version.py --mode working-tree`
+  before `uv build`.
+- Keep `uv run pytest` as a manual or pre-push validation step rather than a
+  pre-commit hook; the suite is required before deployment, but it is heavier
+  than the version-synchronization guard.
+
 For the agreed historical backfill windows, use the canned sequential job:
 
 ```bash
