@@ -33,6 +33,11 @@ Use those documents as the source of truth for ownership, join semantics,
 provenance, reviewed assertions, and promotion boundaries instead of repeating
 that logic in local notes or issue bodies.
 
+For a process-level view of what the main pipeline actually does internally
+(mention extraction, linking, candidate generation, review replay, phase
+segmentation, bounded publish), see
+[docs/PROCESS_TRANSFORMATIONS.md](docs/PROCESS_TRANSFORMATIONS.md).
+
 ## Reviewed Assertions Model
 
 The first reviewed-assertions lifecycle for candidate review and explicit
