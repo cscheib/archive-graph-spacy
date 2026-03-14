@@ -47,6 +47,8 @@ from .themes import derive_theme_tags
 RETAIN_BOUNDARY_DAYS = 45
 MERGED_BOUNDARY_DAYS = 14
 MIN_PHASE_INTERACTIONS = 2
+MAX_PHASE_DURATION_DAYS = 365
+MAX_PHASE_INTERACTION_COUNT = 10_000
 MAX_REPRESENTATIVE_INTERACTIONS_PER_PHASE = 3
 MAX_CENTRAL_PEOPLE_PER_PHASE = 5
 MAX_THEME_SUMMARIES_PER_PHASE = 5
@@ -113,6 +115,110 @@ def _normalized_timestamp_string(timestamp: datetime) -> str:
     return _normalized_timestamp(timestamp).isoformat()
 
 
+def _gap_days(left: Message, right: Message) -> float:
+    if left.timestamp is None or right.timestamp is None:
+        missing_id = left.message_id if left.timestamp is None else right.message_id
+        raise ValueError(
+            f"Phase segmentation requires all messages to have timestamps; "
+            f"missing timestamp on message_id={missing_id!r}"
+        )
+    return (_normalized_timestamp(right.timestamp) - _normalized_timestamp(left.timestamp)).total_seconds() / 86400
+
+
+def _segment_duration_days(segment: tuple[Message, ...]) -> float:
+    if len(segment) < 2:
+        return 0.0
+    first = segment[0]
+    last = segment[-1]
+    if first.timestamp is None or last.timestamp is None:
+        missing_id = first.message_id if first.timestamp is None else last.message_id
+        raise ValueError(
+            f"Phase segmentation requires all messages to have timestamps; "
+            f"missing timestamp on message_id={missing_id!r}"
+        )
+    return (_normalized_timestamp(last.timestamp) - _normalized_timestamp(first.timestamp)).total_seconds() / 86400
+
+
+def _segment_exceeds_caps(segment: tuple[Message, ...]) -> bool:
+    return (
+        len(segment) > MAX_PHASE_INTERACTION_COUNT
+        or _segment_duration_days(segment) > MAX_PHASE_DURATION_DAYS
+    )
+
+
+def _target_subdivision_index(segment: tuple[Message, ...]) -> tuple[int, str]:
+    max_index = len(segment) - MIN_PHASE_INTERACTIONS
+    last_valid = MIN_PHASE_INTERACTIONS
+    for index in range(MIN_PHASE_INTERACTIONS, max_index + 1):
+        left_segment = segment[:index]
+        duration_days = _segment_duration_days(left_segment)
+        if index > MAX_PHASE_INTERACTION_COUNT:
+            return max(MIN_PHASE_INTERACTIONS, index - 1), "interaction_cap"
+        if duration_days > MAX_PHASE_DURATION_DAYS:
+            return max(MIN_PHASE_INTERACTIONS, index - 1), "duration_cap"
+        last_valid = index
+    return min(last_valid, max_index), "balanced_split"
+
+
+def _choose_subdivision_index(segment: tuple[Message, ...]) -> tuple[int, str, str]:
+    target_index, fallback_reason = _target_subdivision_index(segment)
+    merged_gap_candidates: list[tuple[int, float]] = []
+    for index, (left, right) in enumerate(zip(segment, segment[1:]), start=1):
+        if index < MIN_PHASE_INTERACTIONS or len(segment) - index < MIN_PHASE_INTERACTIONS:
+            continue
+        gap_days = _gap_days(left, right)
+        if gap_days >= MERGED_BOUNDARY_DAYS:
+            merged_gap_candidates.append((index, gap_days))
+    if merged_gap_candidates:
+        split_at, gap_days = max(
+            merged_gap_candidates,
+            key=lambda item: (item[1], -abs(item[0] - target_index), item[0]),
+        )
+        return (
+            split_at,
+            "merged_gap_subdivision",
+            f"subdivided oversized segment at {gap_days:.3f} day gap",
+        )
+    if fallback_reason == "interaction_cap":
+        return (
+            target_index,
+            "interaction_cap",
+            f"subdivided oversized segment at {target_index} interactions to honor the {MAX_PHASE_INTERACTION_COUNT} interaction cap",
+        )
+    if fallback_reason == "duration_cap":
+        duration_days = _segment_duration_days(segment[:target_index])
+        return (
+            target_index,
+            "duration_cap",
+            f"subdivided oversized segment at {duration_days:.3f} day span to honor the {MAX_PHASE_DURATION_DAYS} day cap",
+        )
+    return (
+        target_index,
+        "balanced_split",
+        f"subdivided oversized segment near index {target_index} to keep bounded phase size",
+    )
+
+
+def _subdivide_oversized_segment(
+    segment: tuple[Message, ...],
+) -> tuple[list[tuple[Message, ...]], list[tuple[str, str, str]]]:
+    if not _segment_exceeds_caps(segment) or len(segment) < MIN_PHASE_INTERACTIONS * 2:
+        return [segment], []
+
+    split_at, reason_code, details = _choose_subdivision_index(segment)
+    left_segment = segment[:split_at]
+    right_segment = segment[split_at:]
+    if len(left_segment) < MIN_PHASE_INTERACTIONS or len(right_segment) < MIN_PHASE_INTERACTIONS:
+        return [segment], []
+
+    left_segments, left_events = _subdivide_oversized_segment(left_segment)
+    right_segments, right_events = _subdivide_oversized_segment(right_segment)
+    return (
+        [*left_segments, *right_segments],
+        [*left_events, (right_segment[0].message_id, reason_code, details), *right_events],
+    )
+
+
 def _derive_phase_outputs(
     *,
     messages: tuple[Message, ...],
@@ -136,6 +242,7 @@ def _derive_phase_outputs(
     if not sorted_messages:
         return (), (), (), (), (), (), (), {
             "suppressed_phase_count": 0,
+            "phase_subdivision_count": 0,
             "phase_boundary_merged_count": 0,
             "phase_boundary_retained_count": 0,
             "phase_representative_interaction_cap": MAX_REPRESENTATIVE_INTERACTIONS_PER_PHASE,
@@ -161,15 +268,7 @@ def _derive_phase_outputs(
     merged_count = 0
     retained_count = 0
     for index, (left, right) in enumerate(zip(sorted_messages, sorted_messages[1:]), start=1):
-        if left.timestamp is None or right.timestamp is None:
-            missing_id = left.message_id if left.timestamp is None else right.message_id
-            raise ValueError(
-                f"Phase segmentation requires all messages to have timestamps; "
-                f"missing timestamp on message_id={missing_id!r}"
-            )
-        left_ts = _normalized_timestamp(left.timestamp)
-        right_ts = _normalized_timestamp(right.timestamp)
-        gap_days = (right_ts - left_ts).total_seconds() / 86400
+        gap_days = _gap_days(left, right)
         if gap_days >= RETAIN_BOUNDARY_DAYS:
             retained_boundary_indexes.add(index)
             retained_count += 1
@@ -187,6 +286,13 @@ def _derive_phase_outputs(
             current_segment = []
     if current_segment:
         segments.append(tuple(current_segment))
+    subdivided_segments: list[tuple[Message, ...]] = []
+    subdivision_events: list[tuple[str, str, str]] = []
+    for segment in segments:
+        refined_segments, refined_events = _subdivide_oversized_segment(segment)
+        subdivided_segments.extend(refined_segments)
+        subdivision_events.extend(refined_events)
+    segments = subdivided_segments
     segment_phase_ids = {
         segment[0].message_id: _phase_id(generation_scope, tuple(message.message_id for message in segment))
         for segment in segments
@@ -215,6 +321,18 @@ def _derive_phase_outputs(
                 reason_code=f"gap_{result}",
                 sample_ref=f"message:{right_message_id}",
                 details=f"{result} boundary after {gap_days:.3f} day gap",
+            )
+        )
+    for right_message_id, reason_code, details in subdivision_events:
+        diagnostics.append(
+            PhaseDiagnosticsRecord(
+                run_id=run_id,
+                phase_id=boundary_phase_ids[right_message_id],
+                diagnostic_type="subdivision",
+                result="split",
+                reason_code=reason_code,
+                sample_ref=f"message:{right_message_id}",
+                details=details,
             )
         )
 
@@ -435,6 +553,7 @@ def _derive_phase_outputs(
         tuple(sorted(diagnostics, key=lambda row: (row.diagnostic_type, row.result, row.phase_id, row.sample_ref))),
         {
             "suppressed_phase_count": suppressed_phase_count,
+            "phase_subdivision_count": len(subdivision_events),
             "phase_boundary_merged_count": merged_count,
             "phase_boundary_retained_count": retained_count,
             "phase_representative_interaction_cap": MAX_REPRESENTATIVE_INTERACTIONS_PER_PHASE,
@@ -547,6 +666,7 @@ def run_pipeline(
         quality_metrics.update(
             build_phase_quality_metrics(
                 suppressed_phase_count=int(phase_metrics["suppressed_phase_count"]),
+                phase_subdivision_count=int(phase_metrics["phase_subdivision_count"]),
                 phase_boundary_merged_count=int(phase_metrics["phase_boundary_merged_count"]),
                 phase_boundary_retained_count=int(phase_metrics["phase_boundary_retained_count"]),
                 phase_representative_interaction_cap=int(phase_metrics["phase_representative_interaction_cap"]),
@@ -639,6 +759,7 @@ def run_phase_refresh(
     quality_metrics: dict[str, int | float | bool] = {
         **build_phase_quality_metrics(
             suppressed_phase_count=int(phase_metrics["suppressed_phase_count"]),
+            phase_subdivision_count=int(phase_metrics["phase_subdivision_count"]),
             phase_boundary_merged_count=int(phase_metrics["phase_boundary_merged_count"]),
             phase_boundary_retained_count=int(phase_metrics["phase_boundary_retained_count"]),
             phase_representative_interaction_cap=int(phase_metrics["phase_representative_interaction_cap"]),

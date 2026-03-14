@@ -60,6 +60,7 @@ def build_refresh_run(
 def build_phase_quality_metrics(
     *,
     suppressed_phase_count: int,
+    phase_subdivision_count: int,
     phase_boundary_merged_count: int,
     phase_boundary_retained_count: int,
     phase_representative_interaction_cap: int,
@@ -70,6 +71,7 @@ def build_phase_quality_metrics(
 ) -> dict[str, int]:
     return {
         "suppressed_phase_count": suppressed_phase_count,
+        "phase_subdivision_count": phase_subdivision_count,
         "phase_boundary_merged_count": phase_boundary_merged_count,
         "phase_boundary_retained_count": phase_boundary_retained_count,
         "phase_representative_interaction_cap": phase_representative_interaction_cap,

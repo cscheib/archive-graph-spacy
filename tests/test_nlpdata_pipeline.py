@@ -1,5 +1,6 @@
 import json
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 
 from archive_graph_spacy.nlpdata.pipeline import build_pipeline_payload, run_phase_refresh, run_pipeline
 from archive_graph_spacy.nlpdata.runs import meets_runtime_goal, semantic_replay_key
@@ -97,6 +98,43 @@ def test_run_phase_refresh_rebuilds_archive_wide_phases_after_batched_runs() -> 
         (row.diagnostic_type, row.result, row.reason_code, row.sample_ref)
         for row in whole.phase_diagnostics
     ]
+
+
+def test_run_phase_refresh_subdivides_oversized_dense_archive_phase() -> None:
+    contacts = (
+        Contact(person_id="p-alice", display_name="Alice", emails=("alice@example.com",), entity_type="person"),
+        Contact(person_id="p-bob", display_name="Bob", emails=("bob@example.com",), entity_type="person"),
+    )
+    messages = tuple(
+        Message(
+            message_id=f"m-{index:03d}",
+            source="email",
+            sender="alice@example.com" if index % 2 else "bob@example.com",
+            recipients=("bob@example.com",) if index % 2 else ("alice@example.com",),
+            subject=f"Monthly message {index}",
+            body="Dense archive phase fixture",
+            timestamp=datetime(2010, 1, 1, tzinfo=UTC) + timedelta(days=index * 30),
+        )
+        for index in range(48)
+    )
+
+    refreshed = run_phase_refresh(
+        messages=messages,
+        person_links=(),
+        theme_tags=(),
+        person_person_edges=(),
+        person_person_edge_evidence=(),
+        run_scope="archive-wide-phases",
+    )
+
+    assert len(refreshed.phases) > 1
+    assert max(row.interaction_count for row in refreshed.phases) < len(messages)
+    assert all(
+        (datetime.fromisoformat(row.end_at) - datetime.fromisoformat(row.start_at)).days <= 395
+        for row in refreshed.phases
+    )
+    assert refreshed.run.quality_metrics["phase_subdivision_count"] >= 1
+    assert any(row.diagnostic_type == "subdivision" and row.result == "split" for row in refreshed.phase_diagnostics)
 
 
 def test_runtime_goal_helper_uses_rate_based_threshold() -> None:
