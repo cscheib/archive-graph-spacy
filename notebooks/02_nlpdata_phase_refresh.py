@@ -263,7 +263,6 @@ for table_name in (
     "phase_pair_summaries",
     "phase_pair_evidence",
     "phase_representative_interactions",
-    "phase_diagnostics",
 ):
     spark.sql(_deactivate_all_current_phase_rows_sql(catalog, schema, table_name))
 
