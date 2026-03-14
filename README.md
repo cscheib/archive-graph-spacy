@@ -323,6 +323,9 @@ databricks bundle run -t dev nlpdata_refresh
 The bundle deploys the project wheel plus a notebook-driven refresh job that
 uses Spark SQL to read directly from `personal_archive_dev.gold` and
 `personal_archive_dev.memory`, then writes `personal_archive_dev.nlpdata`.
+Bounded refresh windows now publish mentions, links, candidates, themes, search
+docs, and pair evidence first; archive-wide phase outputs are rebuilt in a
+second pass after the batched writes complete.
 
 Use `uv run python tools/deploy_bundle.py dev` when packaged Python code has
 changed and you need a fresh wheel path for Databricks serverless caching.
@@ -365,6 +368,10 @@ That job runs these windows in order:
 - `2023-07-01` to `2024-07-01`
 - `2024-07-01` to `2025-07-01`
 - `2025-07-01` to `2026-07-01`
+
+After the last window finishes, the job runs `02_nlpdata_phase_refresh.py` to
+derive one archive-wide set of `phases` and `phase_*` tables from the
+accumulated current `nlpdata` rows.
 
 The emitted rows distinguish explicit metadata edges (`sender`, `recipient`)
 from inferred mention edges (`mentioned`).

@@ -340,6 +340,18 @@ class PipelineResult:
 
 
 @dataclass(frozen=True)
+class PhaseRefreshResult:
+    run: RefreshRun
+    phases: tuple[PhaseRecord, ...] = ()
+    phase_central_people: tuple[PhaseCentralPersonRecord, ...] = ()
+    phase_theme_summaries: tuple[PhaseThemeSummaryRecord, ...] = ()
+    phase_pair_summaries: tuple[PhasePairSummaryRecord, ...] = ()
+    phase_pair_evidence: tuple[PhasePairEvidenceRecord, ...] = ()
+    phase_representative_interactions: tuple[PhaseRepresentativeInteractionRecord, ...] = ()
+    phase_diagnostics: tuple[PhaseDiagnosticsRecord, ...] = ()
+
+
+@dataclass(frozen=True)
 class BoundedPublishScope:
     run_id: str
     run_scope: str

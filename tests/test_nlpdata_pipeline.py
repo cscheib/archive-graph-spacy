@@ -1,6 +1,7 @@
 import json
+from dataclasses import replace
 
-from archive_graph_spacy.nlpdata.pipeline import build_pipeline_payload, run_pipeline
+from archive_graph_spacy.nlpdata.pipeline import build_pipeline_payload, run_phase_refresh, run_pipeline
 from archive_graph_spacy.nlpdata.runs import meets_runtime_goal, semantic_replay_key
 from archive_graph_spacy.nlpdata.source_loader import load_source_bundle
 from archive_graph_spacy.models import Contact, Message
@@ -26,6 +27,76 @@ def test_run_pipeline_records_run_counts_and_quality_metrics() -> None:
     assert result.run.output_row_counts["message_person_links"] == len(result.person_links)
     assert "runtime_seconds" in result.run.quality_metrics
     assert "meets_runtime_goal" in result.run.quality_metrics
+
+
+def test_run_pipeline_can_defer_phase_analysis() -> None:
+    result = run_pipeline(
+        load_source_bundle("data_samples/phase_temporal_outputs"),
+        run_scope="phase-batch",
+        include_phases=False,
+    )
+
+    assert result.phases == ()
+    assert result.phase_central_people == ()
+    assert result.run.output_row_counts["phases"] == 0
+    assert result.run.output_row_counts["phase_diagnostics"] == 0
+    assert result.run.quality_metrics["phase_analysis_deferred"] is True
+
+
+def test_run_phase_refresh_rebuilds_archive_wide_phases_after_batched_runs() -> None:
+    bundle = load_source_bundle("data_samples/phase_temporal_outputs")
+    whole = run_pipeline(bundle, run_scope="whole-scope")
+    midpoint = 4
+    first_batch = run_pipeline(
+        replace(bundle, messages=bundle.messages[:midpoint]),
+        run_scope="batch-1",
+        include_phases=False,
+    )
+    second_batch = run_pipeline(
+        replace(bundle, messages=bundle.messages[midpoint:]),
+        run_scope="batch-2",
+        include_phases=False,
+    )
+
+    refreshed = run_phase_refresh(
+        messages=bundle.messages,
+        person_links=first_batch.person_links + second_batch.person_links,
+        theme_tags=first_batch.theme_tags + second_batch.theme_tags,
+        person_person_edges=first_batch.person_person_edges + second_batch.person_person_edges,
+        person_person_edge_evidence=(
+            first_batch.person_person_edge_evidence + second_batch.person_person_edge_evidence
+        ),
+        run_scope="archive-wide-phases",
+    )
+
+    assert [
+        (row.phase_index, row.start_at, row.end_at, row.interaction_count)
+        for row in refreshed.phases
+    ] == [
+        (row.phase_index, row.start_at, row.end_at, row.interaction_count)
+        for row in whole.phases
+    ]
+    assert [(row.person_id, row.rank) for row in refreshed.phase_central_people] == [
+        (row.person_id, row.rank) for row in whole.phase_central_people
+    ]
+    assert [(row.theme, row.rank) for row in refreshed.phase_theme_summaries] == [
+        (row.theme, row.rank) for row in whole.phase_theme_summaries
+    ]
+    assert {row.pair_id for row in refreshed.phase_pair_summaries} == {
+        row.pair_id for row in whole.phase_pair_summaries
+    }
+    assert refreshed.phase_pair_evidence
+    assert whole.phase_pair_evidence
+    assert [(row.interaction_ref, row.rank) for row in refreshed.phase_representative_interactions] == [
+        (row.interaction_ref, row.rank) for row in whole.phase_representative_interactions
+    ]
+    assert [
+        (row.diagnostic_type, row.result, row.reason_code, row.sample_ref)
+        for row in refreshed.phase_diagnostics
+    ] == [
+        (row.diagnostic_type, row.result, row.reason_code, row.sample_ref)
+        for row in whole.phase_diagnostics
+    ]
 
 
 def test_runtime_goal_helper_uses_rate_based_threshold() -> None:

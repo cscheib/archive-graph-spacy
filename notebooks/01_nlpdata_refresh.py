@@ -135,7 +135,13 @@ bundle = source_bundle_from_rows(
     contact_rows,
     message_rows,
 )
-result = run_pipeline(bundle, run_scope=f"{catalog}.gold", source_catalog=catalog)
+refresh_phases = start_date is None and end_date is None
+result = run_pipeline(
+    bundle,
+    run_scope=f"{catalog}.gold",
+    source_catalog=catalog,
+    include_phases=False,
+)
 
 payload = {
     "nlp_runs": [
@@ -153,13 +159,6 @@ payload = {
     "reviewed_effects": [row.to_record() for row in result.reviewed_effects],
     "person_person_edges": [row.to_record() for row in result.person_person_edges],
     "person_person_edge_evidence": [row.to_record() for row in result.person_person_edge_evidence],
-    "phases": [row.to_record() for row in result.phases],
-    "phase_central_people": [row.to_record() for row in result.phase_central_people],
-    "phase_theme_summaries": [row.to_record() for row in result.phase_theme_summaries],
-    "phase_pair_summaries": [row.to_record() for row in result.phase_pair_summaries],
-    "phase_pair_evidence": [row.to_record() for row in result.phase_pair_evidence],
-    "phase_representative_interactions": [row.to_record() for row in result.phase_representative_interactions],
-    "phase_diagnostics": [row.to_record() for row in result.phase_diagnostics],
     "message_theme_tags": [row.to_record() for row in result.theme_tags],
     "message_search_docs": [row.to_record() for row in result.search_docs],
 }
@@ -226,11 +225,27 @@ for table_name, ddl in TABLE_DDLS.items():
         """
     )
 
-print(
-    {
-        "run_id": result.run.run_id,
-        "input_interaction_count": result.run.input_interaction_count,
-        "output_row_counts": result.run.output_row_counts,
-        "quality_metrics": result.run.quality_metrics,
-    }
-)
+summary = {
+    "run_id": result.run.run_id,
+    "input_interaction_count": result.run.input_interaction_count,
+    "output_row_counts": result.run.output_row_counts,
+    "quality_metrics": result.run.quality_metrics,
+}
+if refresh_phases:
+    phase_refresh_payload = json.loads(
+        dbutils.notebook.run(
+            "./02_nlpdata_phase_refresh",
+            0,
+            {
+                "catalog": catalog,
+                "schema": schema,
+                "wheel_path": wheel_path,
+                "warehouse_id": dbutils.widgets.get("warehouse_id"),
+                "message_limit": message_limit,
+            },
+        )
+    )
+    summary["phase_refresh"] = phase_refresh_payload
+
+print(summary)
+dbutils.notebook.exit(json.dumps(summary))

@@ -16,6 +16,7 @@ from .contracts import TABLE_CONTRACTS
 from .models import (
     CandidateDiagnosticsSummary,
     CandidateAssertion,
+    PhaseRefreshResult,
     PhaseCentralPersonRecord,
     PhaseDiagnosticsRecord,
     PhasePairEvidenceRecord,
@@ -449,6 +450,7 @@ def run_pipeline(
     *,
     run_scope: str,
     source_catalog: str = "personal_archive_dev",
+    include_phases: bool = True,
 ) -> PipelineResult:
     run_id = new_run_id()
     started_at = utc_now()
@@ -485,24 +487,34 @@ def run_pipeline(
         generation_scope=run_scope,
     )
 
-    (
-        phases,
-        phase_central_people,
-        phase_theme_summaries,
-        phase_pair_summaries,
-        phase_pair_evidence,
-        phase_representative_interactions,
-        phase_diagnostics,
-        phase_metrics,
-    ) = _derive_phase_outputs(
-        messages=bundle.messages,
-        person_links=person_links,
-        theme_tags=theme_tags,
-        person_person_edges=person_person_edges,
-        person_person_edge_evidence=person_person_edge_evidence,
-        run_id=run_id,
-        generation_scope=run_scope,
-    )
+    if include_phases:
+        (
+            phases,
+            phase_central_people,
+            phase_theme_summaries,
+            phase_pair_summaries,
+            phase_pair_evidence,
+            phase_representative_interactions,
+            phase_diagnostics,
+            phase_metrics,
+        ) = _derive_phase_outputs(
+            messages=bundle.messages,
+            person_links=person_links,
+            theme_tags=theme_tags,
+            person_person_edges=person_person_edges,
+            person_person_edge_evidence=person_person_edge_evidence,
+            run_id=run_id,
+            generation_scope=run_scope,
+        )
+    else:
+        phases = ()
+        phase_central_people = ()
+        phase_theme_summaries = ()
+        phase_pair_summaries = ()
+        phase_pair_evidence = ()
+        phase_representative_interactions = ()
+        phase_diagnostics = ()
+        phase_metrics = {}
 
     duration_seconds = time.perf_counter() - started_timer
     completed_at = utc_now()
@@ -528,19 +540,24 @@ def run_pipeline(
         **candidate_summary.suppressed_counts,
         **theme_suppressed,
         **search_suppressed,
-        **build_phase_quality_metrics(
-            suppressed_phase_count=int(phase_metrics["suppressed_phase_count"]),
-            phase_boundary_merged_count=int(phase_metrics["phase_boundary_merged_count"]),
-            phase_boundary_retained_count=int(phase_metrics["phase_boundary_retained_count"]),
-            phase_representative_interaction_cap=int(phase_metrics["phase_representative_interaction_cap"]),
-            phase_pair_evidence_cap=int(phase_metrics["phase_pair_evidence_cap"]),
-            phase_pair_evidence_phase_cap=int(phase_metrics["phase_pair_evidence_phase_cap"]),
-            phase_boundary_diagnostic_cap=int(phase_metrics["phase_boundary_diagnostic_cap"]),
-            phase_diagnostics_count=len(phase_diagnostics),
-        ),
         "runtime_seconds": round(duration_seconds, 6),
         "meets_runtime_goal": meets_runtime_goal(len(bundle.messages), duration_seconds),
     }
+    if include_phases:
+        quality_metrics.update(
+            build_phase_quality_metrics(
+                suppressed_phase_count=int(phase_metrics["suppressed_phase_count"]),
+                phase_boundary_merged_count=int(phase_metrics["phase_boundary_merged_count"]),
+                phase_boundary_retained_count=int(phase_metrics["phase_boundary_retained_count"]),
+                phase_representative_interaction_cap=int(phase_metrics["phase_representative_interaction_cap"]),
+                phase_pair_evidence_cap=int(phase_metrics["phase_pair_evidence_cap"]),
+                phase_pair_evidence_phase_cap=int(phase_metrics["phase_pair_evidence_phase_cap"]),
+                phase_boundary_diagnostic_cap=int(phase_metrics["phase_boundary_diagnostic_cap"]),
+                phase_diagnostics_count=len(phase_diagnostics),
+            )
+        )
+    else:
+        quality_metrics["phase_analysis_deferred"] = True
     run = build_refresh_run(
         run_id=run_id,
         run_scope=run_scope,
@@ -574,6 +591,84 @@ def run_pipeline(
             for key, value in quality_metrics.items()
             if key not in {"runtime_seconds", "meets_runtime_goal"}
         },
+    )
+
+
+def run_phase_refresh(
+    *,
+    messages: tuple[Message, ...],
+    person_links: tuple[PersonMessageLink, ...],
+    theme_tags: tuple[ThemeTag, ...],
+    person_person_edges: tuple[PersonPersonEdgeRecord, ...],
+    person_person_edge_evidence: tuple[PersonPersonEdgeEvidenceRecord, ...],
+    run_scope: str,
+    source_catalog: str = "personal_archive_dev",
+) -> PhaseRefreshResult:
+    run_id = new_run_id()
+    started_at = utc_now()
+    started_timer = time.perf_counter()
+    (
+        phases,
+        phase_central_people,
+        phase_theme_summaries,
+        phase_pair_summaries,
+        phase_pair_evidence,
+        phase_representative_interactions,
+        phase_diagnostics,
+        phase_metrics,
+    ) = _derive_phase_outputs(
+        messages=messages,
+        person_links=person_links,
+        theme_tags=theme_tags,
+        person_person_edges=person_person_edges,
+        person_person_edge_evidence=person_person_edge_evidence,
+        run_id=run_id,
+        generation_scope=run_scope,
+    )
+    duration_seconds = time.perf_counter() - started_timer
+    completed_at = utc_now()
+    output_row_counts = {
+        "phases": len(phases),
+        "phase_central_people": len(phase_central_people),
+        "phase_theme_summaries": len(phase_theme_summaries),
+        "phase_pair_summaries": len(phase_pair_summaries),
+        "phase_pair_evidence": len(phase_pair_evidence),
+        "phase_representative_interactions": len(phase_representative_interactions),
+        "phase_diagnostics": len(phase_diagnostics),
+    }
+    quality_metrics: dict[str, int | float | bool] = {
+        **build_phase_quality_metrics(
+            suppressed_phase_count=int(phase_metrics["suppressed_phase_count"]),
+            phase_boundary_merged_count=int(phase_metrics["phase_boundary_merged_count"]),
+            phase_boundary_retained_count=int(phase_metrics["phase_boundary_retained_count"]),
+            phase_representative_interaction_cap=int(phase_metrics["phase_representative_interaction_cap"]),
+            phase_pair_evidence_cap=int(phase_metrics["phase_pair_evidence_cap"]),
+            phase_pair_evidence_phase_cap=int(phase_metrics["phase_pair_evidence_phase_cap"]),
+            phase_boundary_diagnostic_cap=int(phase_metrics["phase_boundary_diagnostic_cap"]),
+            phase_diagnostics_count=len(phase_diagnostics),
+        ),
+        "runtime_seconds": round(duration_seconds, 6),
+        "meets_runtime_goal": meets_runtime_goal(len(messages), duration_seconds),
+    }
+    run = build_refresh_run(
+        run_id=run_id,
+        run_scope=run_scope,
+        source_catalog=source_catalog,
+        started_at=started_at,
+        completed_at=completed_at,
+        input_interaction_count=len(messages),
+        output_row_counts=output_row_counts,
+        quality_metrics=quality_metrics,
+    )
+    return PhaseRefreshResult(
+        run=run,
+        phases=phases,
+        phase_central_people=phase_central_people,
+        phase_theme_summaries=phase_theme_summaries,
+        phase_pair_summaries=phase_pair_summaries,
+        phase_pair_evidence=phase_pair_evidence,
+        phase_representative_interactions=phase_representative_interactions,
+        phase_diagnostics=phase_diagnostics,
     )
 
 

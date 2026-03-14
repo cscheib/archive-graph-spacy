@@ -199,3 +199,17 @@ resources:
               people_limit: "{{job.parameters.people_limit}}"
               start_date: "2025-07-01"
               end_date: "2026-07-01"
+        - task_key: refresh_global_phases
+          depends_on:
+            - task_key: backfill_11_2025_h2_2026_h1
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 7200
+          notebook_task:
+            notebook_path: ../notebooks/02_nlpdata_phase_refresh.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "nlpdata"
+              wheel_path: "{{job.parameters.wheel_path}}"
+              warehouse_id: "${var.warehouse_id}"
+              message_limit: "{{job.parameters.message_limit}}"

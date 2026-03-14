@@ -14,7 +14,7 @@ This document answers: "what actually happens to the data inside each primary pr
 - `Suppress`: deliberately drop noisy or low-confidence derivations
 - `Replay`: re-apply prior human review to regenerated candidates
 - `Project`: reshape link data into search, edge, or review surfaces
-- `Segment`: split message streams into bounded temporal phases
+- `Segment`: split the accumulated message stream into bounded temporal phases
 - `Stage`: upload local artifacts for publish
 - `Finalize`: deactivate prior current rows and activate the new run’s staged rows
 
@@ -22,15 +22,17 @@ This document answers: "what actually happens to the data inside each primary pr
 
 ```mermaid
 flowchart TB
-    A["build_nlpdata.py<br/>local or Databricks source loader"] --> B["run_pipeline()<br/>mentions + links + review replay + themes + search + phases"]
+    A["build_nlpdata.py<br/>local or Databricks source loader"] --> B["run_pipeline()<br/>mentions + links + review replay + themes + search"]
     B --> C["derived/nlpdata/*.jsonl|json"]
     C --> D["deploy_staged_payload()<br/>bounded publish to Databricks"]
 
     E["01_nlpdata_refresh.py"] --> B
-    B --> F["personal_archive_dev.nlpdata.*"]
+    B --> F["personal_archive_dev.nlpdata current-state rows"]
+    F --> G["02_nlpdata_phase_refresh.py<br/>global phase rebuild"]
+    G --> H["personal_archive_dev.nlpdata phase tables"]
 
-    G["build_edges.py"] --> H["derived/*.jsonl edge tables"]
-    H --> I["query_edges.py / visualize_ego.py / visualize_graph.py"]
+    I["build_edges.py"] --> J["derived/*.jsonl edge tables"]
+    J --> K["query_edges.py / visualize_ego.py / visualize_graph.py"]
 ```
 
 ## Data Families
@@ -55,7 +57,7 @@ flowchart LR
     subgraph GraphFlow["Relationship derivation"]
         G1["person_person_edges"]
         G2["person_person_edge_evidence"]
-        G3["phases + phase_* outputs"]
+        G3["phases + phase_* outputs<br/>(second pass over accumulated current rows)"]
     end
 
     subgraph Publish["Publish state"]
@@ -323,7 +325,7 @@ flowchart TB
 
 ## 9. Phase Segmentation and Temporal Outputs
 
-Goal: turn the message stream into bounded temporal phases with diagnostics.
+Goal: turn the accumulated message stream into bounded temporal phases with diagnostics.
 
 ```mermaid
 flowchart TB
@@ -342,6 +344,9 @@ flowchart TB
 
 ### What actually happens
 
+- Phase analysis now runs after the batch-oriented `nlpdata` writes complete.
+- It reads the accumulated current-state message, link, theme, and pair-evidence
+  rows, then rebuilds all phase tables in one global pass.
 - Only timestamped messages participate in phases.
 - Messages are sorted chronologically and split on large gaps.
 - Current defaults:
@@ -402,7 +407,7 @@ flowchart TB
 
 ## 12. Databricks Notebook Surface: `01_nlpdata_refresh.py`
 
-Goal: run the same derivation fully inside Databricks and publish directly.
+Goal: run the batch-oriented derivation inside Databricks and publish directly.
 
 ```mermaid
 flowchart TB
@@ -411,19 +416,34 @@ flowchart TB
     B --> D["run_pipeline()"]
     C --> D
     D --> E["create temp views over result rows"]
-    E --> F["insert into nlpdata tables"]
+    E --> F["insert non-phase nlpdata tables"]
     F --> G["current-state finalization for bounded tables"]
+    G --> H["optional chain to 02_nlpdata_phase_refresh.py"]
 ```
 
 ### What actually happens
 
 - The notebook reconstructs the in-memory source bundle from Spark SQL rows.
-- It runs the same `run_pipeline()` logic as the CLI path.
+- It runs the same `run_pipeline()` logic as the CLI path, but defers phase
+  outputs for bounded refresh windows.
 - It creates temp views for each result table, including the singleton `nlp_runs` row.
 - For candidate assertions, it first deletes matching existing candidate ids to avoid rerun duplication.
 - For current-state tables, it deactivates prior rows for the same identity set and then activates the staged rows for the new run.
+- Unbounded refreshes chain into `02_nlpdata_phase_refresh.py` after the non-phase writes complete.
 
-## 13. Publish / Deploy Surface
+## 13. Databricks Notebook Surface: `02_nlpdata_phase_refresh.py`
+
+Goal: rebuild `phases` and `phase_*` tables after batch accumulation.
+
+- Loads the full eligible interaction stream from `gold.interactions`.
+- Loads current `message_person_links`, `message_theme_tags`, and
+  `person_person_edges` from `nlpdata`.
+- Deduplicates `person_person_edge_evidence` against the current pair set.
+- Runs the global phase refresh pass.
+- Deactivates prior current phase rows by generation scope, then inserts the new
+  phase rows.
+
+## 14. Publish / Deploy Surface
 
 Goal: stage local artifacts to DBFS and apply bounded publish semantics safely.
 
@@ -455,7 +475,7 @@ flowchart TB
   - activate the staged rows for this run
 - Diagnostics are written back to `nlp_runs.publish_diagnostics`.
 
-## 14. Local Edge Analysis Path
+## 15. Local Edge Analysis Path
 
 Goal: provide a simpler, non-`nlpdata` graph-analysis surface over export bundles.
 
