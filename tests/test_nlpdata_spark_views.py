@@ -197,6 +197,14 @@ def test_refresh_notebook_uses_typed_temp_view_helper() -> None:
     assert "CREATE OR REPLACE TEMP VIEW" in notebook
 
 
+def test_phase_refresh_notebook_uses_preview_subject_message_text() -> None:
+    notebook = Path("notebooks/02_nlpdata_phase_refresh.py").read_text(encoding="utf-8")
+
+    assert "COALESCE(i.preview, i.subject) IS NOT NULL" in notebook
+    assert "COALESCE(i.preview, i.subject, '') AS body" in notebook
+    assert "COALESCE(i.body, i.preview, i.subject)" not in notebook
+
+
 @pytest.mark.skipif(
     not Path("/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home").exists(),
     reason="Homebrew OpenJDK 17 not available",

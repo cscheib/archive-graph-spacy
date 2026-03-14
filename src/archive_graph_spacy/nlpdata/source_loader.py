@@ -184,7 +184,7 @@ def load_source_bundle_from_databricks(
 
     predicates = [
         f"i.interaction_type IN ({quoted_types})",
-        "COALESCE(i.body, i.preview, i.subject) IS NOT NULL",
+        "COALESCE(i.preview, i.subject) IS NOT NULL",
     ]
     if start_date:
         predicates.append(f"i.timestamp >= {_quote_sql_string(start_date)}")
@@ -200,7 +200,7 @@ def load_source_bundle_from_databricks(
             i.from_email AS sender,
             i.to_email AS recipients,
             i.subject,
-            COALESCE(i.body, i.preview, i.subject, '') AS body,
+            COALESCE(i.preview, i.subject, '') AS body,
             CAST(i.timestamp AS STRING) AS timestamp,
             i.interaction_type
         FROM {quoted_catalog}.gold.interactions i

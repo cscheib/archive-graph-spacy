@@ -83,12 +83,12 @@ message_rows = [
           i.from_email AS sender,
           i.to_email AS recipients,
           i.subject,
-          COALESCE(i.body, i.preview, i.subject, '') AS body,
+          COALESCE(i.preview, i.subject, '') AS body,
           CAST(i.timestamp AS STRING) AS timestamp,
           i.interaction_type
         FROM {quoted_catalog}.gold.interactions i
         WHERE i.interaction_type IN ({quoted_types})
-          AND COALESCE(i.body, i.preview, i.subject) IS NOT NULL
+          AND COALESCE(i.preview, i.subject) IS NOT NULL
         ORDER BY i.timestamp DESC NULLS LAST, i.global_interaction_id
         {message_limit_sql}
         """
