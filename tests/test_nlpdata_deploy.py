@@ -602,6 +602,66 @@ def test_deploy_staged_payload_marks_partial_failure_as_rerunnable(monkeypatch, 
     assert "message_theme_tags" in diagnostics["failed_tables"]
 
 
+def test_deploy_staged_payload_preserves_databricks_runtime_metadata(
+    monkeypatch, tmp_path: Path
+) -> None:
+    _write_payload_fixture(tmp_path)
+    run_rows = [
+        {
+            "run_id": "run-123",
+            "run_scope": "sample-scope",
+            "source_catalog": "personal_archive_dev",
+            "started_at": "2026-03-08T00:00:00+00:00",
+            "completed_at": "2026-03-08T00:00:10+00:00",
+            "status": "completed",
+            "input_interaction_count": 1,
+            "output_row_counts": {},
+            "quality_metrics": {},
+            "publish_diagnostics": {
+                "job_id": "586330214826449",
+                "job_run_id": "187120647835483",
+                "parent_job_run_id": "187120647835483",
+                "task_run_id": "756240538904937",
+                "task_key": "backfill_01_1974_2012",
+                "task_name": "backfill_01_1974_2012",
+            },
+        }
+    ]
+    (tmp_path / "nlp_runs.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in run_rows),
+        encoding="utf-8",
+    )
+
+    sql_client = FakeSqlClient()
+
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.get_workspace_client",
+        lambda profile=None: object(),
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.DatabricksSqlClient",
+        lambda workspace_client, warehouse_id: sql_client,
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.stage_payload_directory",
+        lambda local_dir, run_id, profile=None: "dbfs:/tmp/archive_graph_spacy/nlpdata/run-123",
+    )
+    monkeypatch.setattr(
+        "archive_graph_spacy.nlpdata.deploy.cleanup_staged_directory",
+        lambda remote_dir, profile=None: None,
+    )
+
+    result = deploy_staged_payload(tmp_path, run_id="run-123")
+
+    diagnostics = result["publish_diagnostics"]
+    assert diagnostics["job_id"] == "586330214826449"
+    assert diagnostics["job_run_id"] == "187120647835483"
+    assert diagnostics["parent_job_run_id"] == "187120647835483"
+    assert diagnostics["task_run_id"] == "756240538904937"
+    assert diagnostics["task_key"] == "backfill_01_1974_2012"
+    assert diagnostics["task_name"] == "backfill_01_1974_2012"
+
+
 def test_deploy_staged_payload_returns_diagnostics_when_persist_update_fails(monkeypatch, tmp_path: Path) -> None:
     _write_payload_fixture(tmp_path)
 

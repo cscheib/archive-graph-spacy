@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import uuid
 from datetime import datetime, timezone
+from typing import Mapping
 
 from .models import BoundedPublishScope, PublishDiagnosticsRecord, RefreshRun
 
@@ -108,7 +110,9 @@ def build_publish_diagnostics(
     finalized_tables: tuple[str, ...],
     failed_tables: tuple[str, ...],
     manual_intervention_required: bool,
+    runtime_metadata: Mapping[str, object] | None = None,
 ) -> PublishDiagnosticsRecord:
+    merged_runtime_metadata = merge_publish_diagnostics(runtime_metadata)
     return PublishDiagnosticsRecord(
         run_id=scope.run_id,
         publish_scope=scope.to_record(),
@@ -120,7 +124,81 @@ def build_publish_diagnostics(
         finalized_tables=finalized_tables,
         failed_tables=failed_tables,
         manual_intervention_required=manual_intervention_required,
+        job_id=_coerce_optional_str(merged_runtime_metadata.get("job_id")),
+        job_run_id=_coerce_optional_str(merged_runtime_metadata.get("job_run_id")),
+        parent_job_run_id=_coerce_optional_str(
+            merged_runtime_metadata.get("parent_job_run_id")
+        ),
+        task_run_id=_coerce_optional_str(merged_runtime_metadata.get("task_run_id")),
+        task_key=_coerce_optional_str(merged_runtime_metadata.get("task_key")),
+        task_name=_coerce_optional_str(merged_runtime_metadata.get("task_name")),
     )
+
+
+def _coerce_optional_str(value: object | None) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def build_databricks_runtime_metadata(
+    *,
+    job_id: str | None = None,
+    job_run_id: str | None = None,
+    task_run_id: str | None = None,
+    task_key: str | None = None,
+    task_name: str | None = None,
+) -> dict[str, object]:
+    """Build a normalized Databricks job hierarchy payload for run diagnostics."""
+    resolved_job_id = _coerce_optional_str(job_id) or _coerce_optional_str(
+        os.environ.get("DATABRICKS_JOB_ID")
+    )
+    resolved_job_run_id = _coerce_optional_str(job_run_id) or _coerce_optional_str(
+        os.environ.get("DATABRICKS_JOB_RUN_ID")
+    ) or _coerce_optional_str(os.environ.get("DATABRICKS_RUN_ID"))
+    resolved_task_run_id = _coerce_optional_str(task_run_id) or _coerce_optional_str(
+        os.environ.get("DATABRICKS_TASK_RUN_ID")
+    )
+    resolved_task_key = _coerce_optional_str(task_key) or _coerce_optional_str(
+        os.environ.get("DATABRICKS_TASK_KEY")
+    )
+    resolved_task_name = _coerce_optional_str(task_name) or _coerce_optional_str(
+        os.environ.get("DATABRICKS_TASK_NAME")
+    ) or resolved_task_key
+    if resolved_task_key is None:
+        resolved_task_key = resolved_task_name
+
+    runtime_metadata: dict[str, object] = {}
+    if resolved_job_id is not None:
+        runtime_metadata["job_id"] = resolved_job_id
+    if resolved_job_run_id is not None:
+        runtime_metadata["job_run_id"] = resolved_job_run_id
+        runtime_metadata["parent_job_run_id"] = resolved_job_run_id
+    if resolved_task_run_id is not None:
+        runtime_metadata["task_run_id"] = resolved_task_run_id
+    if resolved_task_key is not None:
+        runtime_metadata["task_key"] = resolved_task_key
+    if resolved_task_name is not None:
+        runtime_metadata["task_name"] = resolved_task_name
+    return runtime_metadata
+
+
+def merge_publish_diagnostics(
+    *payloads: Mapping[str, object] | None,
+) -> dict[str, object]:
+    """Merge publish-diagnostics payloads, ignoring empty values."""
+    merged: dict[str, object] = {}
+    for payload in payloads:
+        if not payload:
+            continue
+        for key, value in payload.items():
+            if value is None:
+                continue
+            if isinstance(value, str) and not value.strip():
+                continue
+            merged[key] = value
+    return merged
 
 
 def semantic_replay_key(

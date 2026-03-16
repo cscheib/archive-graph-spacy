@@ -170,8 +170,15 @@ def test_ordered_rows_for_phase_diagnostics_preserves_phase_details() -> None:
 def test_refresh_notebook_uses_typed_temp_view_helper() -> None:
     notebook = Path("notebooks/01_nlpdata_refresh.py").read_text(encoding="utf-8")
 
+    assert 'dbutils.widgets.text("job_id", "", "Databricks Job ID")' in notebook
+    assert 'dbutils.widgets.text("job_run_id", "", "Databricks Job Run ID")' in notebook
+    assert 'dbutils.widgets.text("task_run_id", "", "Databricks Task Run ID")' in notebook
+    assert 'dbutils.widgets.text("task_name", "", "Databricks Task Name")' in notebook
     assert "from archive_graph_spacy.nlpdata.spark_views import create_temp_view_from_rows" in notebook
     assert "from archive_graph_spacy.nlpdata.deploy import (" in notebook
+    assert "from archive_graph_spacy.nlpdata.runs import (" in notebook
+    assert "build_databricks_runtime_metadata" in notebook
+    assert "merge_publish_diagnostics" in notebook
     assert "_delete_matching_candidate_assertions_sql" in notebook
     assert (
         "from archive_graph_spacy.nlpdata.deploy import CURRENT_STATE_IDENTITY_COLUMNS, CURRENT_STATE_TABLES, TABLE_DDLS"
@@ -179,7 +186,7 @@ def test_refresh_notebook_uses_typed_temp_view_helper() -> None:
     )
     assert "create_temp_view_from_rows(" in notebook
     assert "spark.createDataFrame(rows).createOrReplaceTempView(temp_view)" not in notebook
-    assert '"publish_diagnostics": json.dumps(result.run.publish_diagnostics)' in notebook
+    assert '"publish_diagnostics": json.dumps(run_publish_diagnostics)' in notebook
     assert 'subprocess.check_call(["pip", "install", wheel_path])' in notebook
     assert "os.path.exists(wheel_path)" not in notebook
     assert "spark.sql(_show_columns_sql(catalog, schema, table_name)).collect()" in notebook
@@ -189,6 +196,7 @@ def test_refresh_notebook_uses_typed_temp_view_helper() -> None:
     assert "for table_name, rows in payload.items():" in notebook
     assert "rows = payload[table_name]" not in notebook
     assert 'if table_name == "nlp_runs":' in notebook
+    assert "run_publish_diagnostics = merge_publish_diagnostics(result.run.publish_diagnostics, runtime_metadata)" in notebook
     assert '"candidate_assertions_summary": [result.candidate_summary.to_record()]' in notebook
     assert '"reviewed_effects": [row.to_record() for row in result.reviewed_effects]' in notebook
     assert 'if table_name == "candidate_assertions":' in notebook
@@ -200,11 +208,26 @@ def test_refresh_notebook_uses_typed_temp_view_helper() -> None:
 def test_phase_refresh_notebook_uses_preview_subject_message_text() -> None:
     notebook = Path("notebooks/02_nlpdata_phase_refresh.py").read_text(encoding="utf-8")
 
+    assert 'dbutils.widgets.text("job_id", "", "Databricks Job ID")' in notebook
+    assert 'dbutils.widgets.text("job_run_id", "", "Databricks Job Run ID")' in notebook
+    assert 'dbutils.widgets.text("task_run_id", "", "Databricks Task Run ID")' in notebook
+    assert 'dbutils.widgets.text("task_name", "", "Databricks Task Name")' in notebook
+    assert "build_databricks_runtime_metadata" in notebook
+    assert "merge_publish_diagnostics" in notebook
     assert "COALESCE(i.preview, i.subject) IS NOT NULL" in notebook
     assert "COALESCE(i.preview, i.subject, '') AS body" in notebook
     assert "COALESCE(i.body, i.preview, i.subject)" not in notebook
     assert "_deactivate_all_current_phase_rows_sql" in notebook
     assert "_deactivate_phase_scope_rows_sql(catalog, schema, table_name, phase_result.run.run_scope)" not in notebook
+
+
+def test_jobs_bundle_passes_job_hierarchy_metadata_to_nlpdata_notebooks() -> None:
+    bundle = Path("resources/nlpdata_jobs.yml").read_text(encoding="utf-8")
+
+    assert 'job_id: "{{job.id}}"' in bundle
+    assert 'job_run_id: "{{job.run_id}}"' in bundle
+    assert 'task_run_id: "{{task.run_id}}"' in bundle
+    assert 'task_name: "{{task.name}}"' in bundle
 
 
 @pytest.mark.skipif(

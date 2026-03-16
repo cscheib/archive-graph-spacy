@@ -12,6 +12,10 @@ dbutils.widgets.text("message_limit", "", "Message Limit")
 dbutils.widgets.text("people_limit", "", "People Limit")
 dbutils.widgets.text("start_date", "", "Start Date")
 dbutils.widgets.text("end_date", "", "End Date")
+dbutils.widgets.text("job_id", "", "Databricks Job ID")
+dbutils.widgets.text("job_run_id", "", "Databricks Job Run ID")
+dbutils.widgets.text("task_run_id", "", "Databricks Task Run ID")
+dbutils.widgets.text("task_name", "", "Databricks Task Name")
 
 # COMMAND ----------
 
@@ -40,6 +44,10 @@ from archive_graph_spacy.nlpdata.deploy import (
     _show_columns_sql,
 )
 from archive_graph_spacy.nlpdata.pipeline import run_pipeline
+from archive_graph_spacy.nlpdata.runs import (
+    build_databricks_runtime_metadata,
+    merge_publish_diagnostics,
+)
 from archive_graph_spacy.nlpdata.spark_views import create_temp_view_from_rows
 from archive_graph_spacy.nlpdata.source_loader import source_bundle_from_rows
 
@@ -49,6 +57,12 @@ message_limit = dbutils.widgets.get("message_limit").strip()
 people_limit = dbutils.widgets.get("people_limit").strip()
 start_date = dbutils.widgets.get("start_date").strip() or None
 end_date = dbutils.widgets.get("end_date").strip() or None
+runtime_metadata = build_databricks_runtime_metadata(
+    job_id=dbutils.widgets.get("job_id").strip() or None,
+    job_run_id=dbutils.widgets.get("job_run_id").strip() or None,
+    task_run_id=dbutils.widgets.get("task_run_id").strip() or None,
+    task_name=dbutils.widgets.get("task_name").strip() or None,
+)
 
 quoted_catalog = quote_sql_identifier(catalog)
 quoted_schema = quote_sql_identifier(schema)
@@ -142,6 +156,7 @@ result = run_pipeline(
     source_catalog=catalog,
     include_phases=False,
 )
+run_publish_diagnostics = merge_publish_diagnostics(result.run.publish_diagnostics, runtime_metadata)
 
 payload = {
     "nlp_runs": [
@@ -149,7 +164,7 @@ payload = {
             **result.run.to_record(),
             "output_row_counts": json.dumps(result.run.output_row_counts),
             "quality_metrics": json.dumps(result.run.quality_metrics),
-            "publish_diagnostics": json.dumps(result.run.publish_diagnostics),
+            "publish_diagnostics": json.dumps(run_publish_diagnostics),
         }
     ],
     "message_mentions": [row.to_record() for row in result.mentions],

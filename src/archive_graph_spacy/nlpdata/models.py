@@ -380,6 +380,12 @@ class PublishDiagnosticsRecord:
     finalized_tables: tuple[str, ...]
     failed_tables: tuple[str, ...]
     manual_intervention_required: bool
+    job_id: str | None = None
+    job_run_id: str | None = None
+    parent_job_run_id: str | None = None
+    task_run_id: str | None = None
+    task_key: str | None = None
+    task_name: str | None = None
 
     def to_record(self) -> dict[str, object]:
         payload = asdict(self)

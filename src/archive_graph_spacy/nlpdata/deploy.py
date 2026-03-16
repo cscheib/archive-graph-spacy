@@ -14,7 +14,12 @@ from .databricks import (
     validate_run_id,
 )
 from .models import BoundedPublishScope
-from .runs import build_publish_diagnostics, classify_scope_overlap
+from .runs import (
+    build_databricks_runtime_metadata,
+    build_publish_diagnostics,
+    classify_scope_overlap,
+    merge_publish_diagnostics,
+)
 
 DEFAULT_WAREHOUSE_ID = "4b799682f2bfd311"
 DEFAULT_CATALOG = "personal_archive_dev"
@@ -1063,6 +1068,24 @@ def _load_run_scope(local_dir: Path, run_id: str) -> str:
     return str(local_dir)
 
 
+def _load_run_publish_diagnostics(local_dir: Path, run_id: str) -> dict[str, object]:
+    run_rows = _load_jsonl_rows(local_dir / "nlp_runs.jsonl")
+    for row in run_rows:
+        if row.get("run_id") != run_id:
+            continue
+        diagnostics = row.get("publish_diagnostics")
+        if isinstance(diagnostics, dict):
+            return {str(key): value for key, value in diagnostics.items()}
+        if isinstance(diagnostics, str) and diagnostics.strip():
+            try:
+                decoded = json.loads(diagnostics)
+            except json.JSONDecodeError:
+                return {}
+            if isinstance(decoded, dict):
+                return {str(key): value for key, value in decoded.items()}
+    return {}
+
+
 def _collect_bounded_publish_scope(
     local_dir: Path,
     *,
@@ -1129,6 +1152,10 @@ def deploy_staged_payload(
     active_scope_message_ids: tuple[tuple[str, ...], ...] = (),
 ) -> dict[str, object]:
     run_id = validate_run_id(run_id)
+    runtime_metadata = merge_publish_diagnostics(
+        _load_run_publish_diagnostics(local_dir, run_id),
+        build_databricks_runtime_metadata(),
+    )
     workspace_client = get_workspace_client(profile)
     client = DatabricksSqlClient(workspace_client, warehouse_id=warehouse_id)
     remote_dir = stage_payload_directory(local_dir, run_id, profile=profile)
@@ -1147,6 +1174,7 @@ def deploy_staged_payload(
             finalized_tables=(),
             failed_tables=tuple(publish_scope.affected_tables),
             manual_intervention_required=True,
+            runtime_metadata=runtime_metadata,
         ).to_record()
         if cleanup_remote:
             cleanup_staged_directory(remote_dir, profile=profile)
@@ -1242,9 +1270,10 @@ def deploy_staged_payload(
         finalized_tables=tuple(finalized_tables),
         failed_tables=tuple(failed_tables),
         manual_intervention_required=manual_intervention_required,
+        runtime_metadata=runtime_metadata,
     ).to_record()
     if error_detail:
-        diagnostics["error_detail"] = error_detail
+        diagnostics = merge_publish_diagnostics(diagnostics, {"error_detail": error_detail})
     return _finalize_deploy_result(
         client=client,
         catalog=catalog,

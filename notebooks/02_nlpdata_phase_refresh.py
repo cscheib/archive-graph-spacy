@@ -9,6 +9,10 @@ dbutils.widgets.text("schema", "nlpdata", "Schema")
 dbutils.widgets.text("wheel_path", "", "Wheel Path")
 dbutils.widgets.text("warehouse_id", "4b799682f2bfd311", "Warehouse ID")
 dbutils.widgets.text("message_limit", "", "Message Limit")
+dbutils.widgets.text("job_id", "", "Databricks Job ID")
+dbutils.widgets.text("job_run_id", "", "Databricks Job Run ID")
+dbutils.widgets.text("task_run_id", "", "Databricks Task Run ID")
+dbutils.widgets.text("task_name", "", "Databricks Task Name")
 
 # COMMAND ----------
 
@@ -41,12 +45,22 @@ from archive_graph_spacy.nlpdata.models import (
     ThemeTag,
 )
 from archive_graph_spacy.nlpdata.pipeline import run_phase_refresh
+from archive_graph_spacy.nlpdata.runs import (
+    build_databricks_runtime_metadata,
+    merge_publish_diagnostics,
+)
 from archive_graph_spacy.nlpdata.spark_views import create_temp_view_from_rows
 from archive_graph_spacy.nlpdata.source_loader import source_bundle_from_rows
 
 catalog = dbutils.widgets.get("catalog") or "personal_archive_dev"
 schema = dbutils.widgets.get("schema") or "nlpdata"
 message_limit = dbutils.widgets.get("message_limit").strip()
+runtime_metadata = build_databricks_runtime_metadata(
+    job_id=dbutils.widgets.get("job_id").strip() or None,
+    job_run_id=dbutils.widgets.get("job_run_id").strip() or None,
+    task_run_id=dbutils.widgets.get("task_run_id").strip() or None,
+    task_name=dbutils.widgets.get("task_name").strip() or None,
+)
 
 quoted_catalog = quote_sql_identifier(catalog)
 quoted_schema = quote_sql_identifier(schema)
@@ -226,6 +240,10 @@ phase_result = run_phase_refresh(
     run_scope=f"{catalog}.{schema}.phases",
     source_catalog=catalog,
 )
+run_publish_diagnostics = merge_publish_diagnostics(
+    phase_result.run.publish_diagnostics,
+    runtime_metadata,
+)
 
 payload = {
     "nlp_runs": [
@@ -233,7 +251,7 @@ payload = {
             **phase_result.run.to_record(),
             "output_row_counts": json.dumps(phase_result.run.output_row_counts),
             "quality_metrics": json.dumps(phase_result.run.quality_metrics),
-            "publish_diagnostics": json.dumps(phase_result.run.publish_diagnostics),
+            "publish_diagnostics": json.dumps(run_publish_diagnostics),
         }
     ],
     "phases": [row.to_record() for row in phase_result.phases],
